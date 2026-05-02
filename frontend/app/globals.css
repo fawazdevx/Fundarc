@@ -1,0 +1,332 @@
+
+
+@import "tailwindcss";
+@import "@rainbow-me/rainbowkit/styles.css";
+
+
+/* ---------------------------
+   Fundarc Cyberpunk Theme
+---------------------------- */
+
+:root {
+  --bg: #070812;
+  --bg2: #090a18;
+
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-2: rgba(255, 255, 255, 0.085);
+
+  --border: rgba(255, 255, 255, 0.12);
+  --border-2: rgba(255, 255, 255, 0.18);
+
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.70);
+  --faint: rgba(255, 255, 255, 0.52);
+
+  --p1: #a855f7;
+  --p2: #7c3aed;
+  --c1: #22d3ee;
+  --c2: #06b6d4;
+
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  --shadow-soft: 0 12px 34px rgba(0, 0, 0, 0.35);
+  --glow-p: 0 0 26px rgba(168, 85, 247, 0.25);
+  --glow-c: 0 0 26px rgba(34, 211, 238, 0.18);
+
+  --r-lg: 20px;
+  --r-md: 16px;
+  --r-sm: 12px;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter,
+    "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+  letter-spacing: -0.01em;
+
+  background:
+    radial-gradient(900px 520px at 18% 8%, rgba(168, 85, 247, 0.22), transparent 60%),
+    radial-gradient(780px 520px at 88% 24%, rgba(34, 211, 238, 0.16), transparent 55%),
+    radial-gradient(860px 600px at 42% 94%, rgba(124, 58, 237, 0.13), transparent 60%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+  overflow-x: hidden;
+}
+
+/* Subtle grid overlay */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(circle at 30% 18%, rgba(0,0,0,1), rgba(0,0,0,0) 60%);
+  opacity: 0.22;
+}
+
+/* Links */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+  text-decoration-color: rgba(168, 85, 247, 0.75);
+}
+
+::selection {
+  background: rgba(168, 85, 247, 0.35);
+}
+
+/* Typography */
+h1, h2, h3, h4 {
+  margin: 0.15em 0 0.55em;
+  letter-spacing: -0.04em;
+}
+h1 { font-size: clamp(30px, 3.2vw, 44px); line-height: 1.05; }
+h2 { font-size: clamp(18px, 2.1vw, 28px); line-height: 1.12; }
+
+p { margin: 0.6em 0; color: var(--muted); }
+
+/* ---------------------------
+   UI primitives
+---------------------------- */
+
+.app-bg { min-height: 100vh; }
+
+.page {
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 28px 0 64px;
+}
+
+.stack { display: flex; flex-direction: column; gap: 14px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 14px;
+}
+@media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+@media (max-width: 900px) { .grid-3 { grid-template-columns: 1fr; } }
+
+.hero { padding: 18px 18px 16px; }
+
+.hero-title {
+  display: inline-block;
+  background: linear-gradient(90deg, var(--p1), var(--c1));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 18px rgba(168, 85, 247, 0.14);
+}
+
+.subtext { color: var(--muted); font-size: 14px; line-height: 1.55; }
+
+.hr-glow {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.55), rgba(34, 211, 238, 0.35), transparent);
+  opacity: 0.70;
+}
+
+/* Better glass card */
+.card {
+  position: relative;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(1200px 260px at 10% 0%, rgba(168, 85, 247, 0.10), transparent 45%),
+    radial-gradient(900px 260px at 90% 0%, rgba(34, 211, 238, 0.08), transparent 45%),
+    linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.05));
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.card:hover {
+  border-color: rgba(168, 85, 247, 0.24);
+}
+
+/* key-value row */
+.kv {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.kv .k { color: var(--faint); font-size: 12px; }
+.kv .v { color: var(--text); font-weight: 800; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, filter 120ms ease;
+  user-select: none;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(168, 85, 247, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary {
+  border: 1px solid rgba(168, 85, 247, 0.30);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.95), rgba(34, 211, 238, 0.70));
+  box-shadow: var(--glow-p), var(--glow-c), var(--shadow);
+  color: rgba(10, 10, 18, 0.95);
+  font-weight: 800;
+}
+
+.btn-primary:hover {
+  filter: saturate(1.08) brightness(1.02);
+}
+
+/* Inputs */
+input, textarea, select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+textarea { min-height: 110px; resize: vertical; }
+
+input::placeholder, textarea::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: rgba(168, 85, 247, 0.55);
+  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+label {
+  display: block;
+  margin: 10px 0 6px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* Header */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(7, 8, 18, 0.58);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.header-inner {
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 14px 0;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand { display: flex; flex-direction: column; gap: 2px; }
+.brand a { font-weight: 900; letter-spacing: -0.03em; }
+.brand small { color: var(--muted); font-size: 12px; }
+
+/* RainbowKit polish (single block, no duplicates) */
+[data-rk] {
+  color: var(--text);
+}
+
+/* Don’t force our button styling on RK */
+[data-rk] button {
+  all: unset; /* remove our inherited button styles if any leak in */
+}
+
+/* Re-apply basic button behavior without changing RK look */
+[data-rk] button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Optional: small rounding without killing RK internal styling */
+[data-rk] button > div {
+  border-radius: 14px !important;
+}
+
+/* If your header is very transparent, RK can look washed out */
+.header {
+  background: rgba(7, 8, 18, 0.72); /* slightly more opaque */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
