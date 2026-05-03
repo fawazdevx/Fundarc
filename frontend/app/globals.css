@@ -13,7 +13,7 @@
   --muted: rgba(255, 255, 255, 0.68);
   --faint: rgba(255, 255, 255, 0.48);
   --accent: #2dd4bf;
-  --accent-2: rgb(237, 11, 245);
+  --accent-2: #f59e0b;
   --accent-3: #a78bfa;
   --danger: #fb7185;
   --success: #34d399;
@@ -437,7 +437,7 @@ input[type="checkbox"] {
 
 .btn-primary {
   border-color: rgba(45, 212, 191, 0.5);
-  background: linear-gradient(135deg, rgba(212, 45, 184, 0.95), rgba(207, 38, 193, 0.973));
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.95), rgba(245, 158, 11, 0.9));
   color: #07100f;
   box-shadow: 0 12px 28px rgba(45, 212, 191, 0.16), 0 12px 32px rgba(0, 0, 0, 0.28);
 }
