@@ -445,33 +445,6 @@ The deployment script prints:
 
 Use the proxy address as the public factory address in the frontend.
 
-## Frontend Deployment
-
-The frontend includes `@netlify/plugin-nextjs`, so it can be deployed to Netlify as a Next.js site.
-
-### Netlify Settings
-
-Use these settings when importing the repository:
-
-```text
-Base directory: frontend
-Build command: npm run build
-Publish directory: .next
-```
-
-Add the required frontend environment variables in Netlify:
-
-```env
-NEXT_PUBLIC_CHAIN_ID=
-NEXT_PUBLIC_ARC_RPC_URL=
-NEXT_PUBLIC_EXPLORER=
-NEXT_PUBLIC_FACTORY_ADDRESS=
-NEXT_PUBLIC_USDC_ADDRESS=
-NEXT_PUBLIC_WC_PROJECT_ID=
-```
-
-Then deploy the site.
-
 ## Key User Flows
 
 ### Create a Campaign
