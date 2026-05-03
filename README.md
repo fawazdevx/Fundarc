@@ -520,28 +520,8 @@ Refunds are available when a campaign is canceled or failed.
 3. Click `Claim refund`.
 4. The campaign sends the refundable USDC back to the contributor.
 
-## Security Notes
 
-- The contracts use `ReentrancyGuardUpgradeable` on state-changing token transfer flows.
-- Campaigns only accept the configured USDC token.
-- Campaign withdrawals are limited to approved and unlocked milestone amounts.
-- Creator cancellation is blocked after any withdrawal.
-- Voting is limited to contributors with nonzero contribution weight.
-- Each contributor can vote once per milestone.
-- Factory fee changes are owner-controlled.
-- Factory upgrades are owner-controlled through UUPS authorization.
-- The project should be audited before mainnet deployment or production use with real user funds.
-
-## Known Limitations
-
-- Campaigns do not currently include a campaign deadline or funding target enforcement separate from milestone totals.
-- Evidence is stored as a `bytes32` hash only; the actual evidence content must be hosted or shared off-chain.
-- Contribution voting weight is based on total contributed amount and is not snapshotted per milestone.
-- Refund logic returns contributed balances when the campaign is canceled or failed, without subtracting any already-withdrawn successful milestone amount from each funder.
-- The current frontend uses browser alerts for some transaction errors.
-- No dedicated Solidity test suite is included yet.
-
-## Roadmap Ideas
+## Roadmap
 
 - Add campaign funding deadlines.
 - Add minimum funding targets.
@@ -556,4 +536,4 @@ Refunds are available when a campaign is canceled or failed.
 
 ## License
 
-The frontend package currently declares the project license as `ISC`. Smart contract files are marked `MIT` in their SPDX headers.
+
