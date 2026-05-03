@@ -6,6 +6,27 @@ Fundarc is a stablecoin-native crowdfunding dApp built for Arc Testnet. It lets 
 
 Instead of releasing all funds at once, Fundarc splits a campaign into milestones. Contributors fund the campaign with USDC, creators submit milestone evidence, contributors vote with contribution-weighted voting power, and only approved milestones unlock funds for the creator. If a campaign is canceled or fails a milestone vote, funders can claim refunds.
 
+Built fully onchain using upgradeable contracts, minimal proxies, and USDC-based funding logic.
+
+Deployed on Arc Testnet with real contract interactions and live campaign flows.
+
+
+## Try Fundarc
+
+A milestone-based crowdfunding protocol where funds unlock only after contributor approval.
+
+
+Live on Arc Testnet.
+
+👉 App: https://fundarc.netlify.app  
+👉 Demo (2–3 min): 
+
+Test it in minutes:
+1. Connect wallet
+2. Create or fund a campaign
+3. Vote on a milestone
+
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -19,11 +40,8 @@ Instead of releasing all funds at once, Fundarc splits a campaign into milestone
 - [Local Development](#local-development)
 - [Contract Development](#contract-development)
 - [Contract Deployment](#contract-deployment)
-- [Frontend Deployment](#frontend-deployment)
 - [Key User Flows](#key-user-flows)
-- [Security Notes](#security-notes)
-- [Known Limitations](#known-limitations)
-- [Roadmap Ideas](#roadmap-ideas)
+- [Roadmap](#roadmap-ideas)
 - [License](#license)
 
 ## Overview
@@ -428,9 +446,11 @@ Example deployment command:
 cd contracts
 source .env
 forge script script/Deploy.s.sol:Deploy \
-  --rpc-url "$RPC_URL" \
-  --private-key "$PRIVATE_KEY" \
-  --broadcast
+  --rpc-url "$ARC_RPC_URL" \
+  --chain-id "$ARC_CHAIN_ID" \
+  --account "deploytestKey" \
+  --sender "WALLET_ADDRESS" \
+  --broadcast -vvv
 ```
 
 After deployment, copy the printed `FactoryProxy` address into:
@@ -479,7 +499,8 @@ Basis point examples:
 Only the campaign creator can submit a milestone.
 
 1. Open the campaign page.
-2. Enter a `bytes32` evidence hash.
+2. Enter a `bytes32` evidence hash (temporary format - will be upgraded to IPFS/file uploads in future versions).
+
 3. Submit the milestone.
 4. Voting starts immediately and ends after the configured voting period.
 
@@ -525,16 +546,38 @@ Refunds are available when a campaign is canceled or failed.
 
 ## Roadmap
 
-- Add campaign funding deadlines.
-- Add minimum funding targets.
-- Add milestone evidence upload through IPFS or another decentralized storage provider.
-- Add richer campaign metadata such as images, categories, and creator profiles.
-- Add contributor vote history.
-- Add test coverage for contribution, voting, finalization, refunds, fees, and upgrade behavior.
-- Add event indexing for faster dashboard reads.
-- Add campaign search and filtering.
-- Add role-based creator dashboard.
-- Add transaction toast notifications for a smoother UX.
+### Protocol
+- Funding deadlines
+- Minimum funding targets
+- Vote history tracking
+- Test coverage
+
+### UX & Frontend
+- Campaign images, categories, profiles
+- Transaction notifications
+- Search & filtering
+- Creator dashboard roles
+
+### Infrastructure
+- IPFS evidence uploads
+- Event indexing for faster dashboards
+
+
+## Feedback Wanted
+
+I’m actively improving Fundarc and would love input from:
+
+- Smart contract engineers
+- Frontend devs
+- Builders on Arc
+
+Questions:
+- What would stop you from using this?
+- What’s missing for real-world use?
+- How can UX be improved?
+
+Open an issue or reach out 👇
+
 
 ## License
 
