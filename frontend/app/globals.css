@@ -533,11 +533,12 @@ input[type="checkbox"] {
   cursor: pointer;
 }
 
-[data-rk] button > div {
+[data-rk] button>div {
   border-radius: var(--radius-md) !important;
 }
 
 @media (max-width: 960px) {
+
   .grid-2,
   .grid-3,
   .form-grid,
