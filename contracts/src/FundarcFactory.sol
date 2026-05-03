@@ -19,6 +19,11 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
     event CampaignCreated(address indexed creator, address indexed campaign, uint256 indexed campaignId);
     event FeeConfigUpdated(uint16 feeBps, address feeTreasury);
 
+    /// @notice Emitted whenever protocol fees are collected.
+    /// @param campaign The campaign (msg.sender) that paid the fee.
+    /// @param feeAmount Amount of USDC paid as fee.
+    event FeeTaken(address indexed campaign, uint256 feeAmount);
+
     address public usdc;
     address public campaignImplementation;
 
@@ -74,8 +79,11 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
 
     function takeFee(uint256 feeAmount) external nonReentrant returns (bool) {
         if (feeAmount == 0) return true;
+
         require(IERC20Minimal(usdc).transferFrom(msg.sender, feeTreasury, feeAmount), "FEE_TRANSFER_FAIL");
         totalFeesCollected += feeAmount;
+
+        emit FeeTaken(msg.sender, feeAmount);
         return true;
     }
 
@@ -89,7 +97,6 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
     ) external nonReentrant returns (address campaign) {
         campaign = Clones.clone(campaignImplementation);
 
-        // UPDATED initialize signature includes factory address
         FundarcCampaign(campaign).initialize(
             msg.sender,
             usdc,

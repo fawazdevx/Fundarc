@@ -10,7 +10,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <Providers>
           <Header />
-          <div className="app-bg">{children}</div>
+          {children}
         </Providers>
       </body>
     </html>

@@ -13,6 +13,7 @@ import {
 } from "wagmi";
 import { fundarcFactoryAbi } from "@/src/abi/factory";
 import { fundarcCampaignAbi } from "@/src/abi/campaign";
+import { BarChart3, ExternalLink, Plus, RefreshCcw } from "lucide-react";
 
 const FACTORY = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`;
 const EXPLORER = process.env.NEXT_PUBLIC_EXPLORER!;
@@ -34,7 +35,6 @@ export default function HomePage() {
 
   const [showCompleted, setShowCompleted] = useState(false);
 
-  // Create form state
   const [title, setTitle] = useState("Fundarc Campaign");
   const [description, setDescription] = useState(
     "Milestone-based stablecoin crowdfunding on Arc."
@@ -44,7 +44,6 @@ export default function HomePage() {
   const [quorumBps, setQuorumBps] = useState(2000);
   const [passBps, setPassBps] = useState(6000);
 
-  // Count campaigns
   const count = useReadContract({
     abi: fundarcFactoryAbi,
     address: FACTORY,
@@ -53,7 +52,6 @@ export default function HomePage() {
 
   const n = Number(count.data ?? 0n);
 
-  // Read campaign addresses
   const campaignAddrReads = useMemo(() => {
     return Array.from({ length: n }, (_, i) => ({
       abi: fundarcFactoryAbi,
@@ -74,7 +72,6 @@ export default function HomePage() {
       .map((r) => r.result as `0x${string}`);
   }, [campaignAddrs.data]);
 
-  // Read title + milestoneCount + totalWithdrawn per campaign
   const metaReads = useMemo(() => {
     return addresses.flatMap((addr) => [
       { abi: fundarcCampaignAbi, address: addr, functionName: "title" as const },
@@ -88,13 +85,12 @@ export default function HomePage() {
     query: { enabled: metaReads.length > 0 },
   });
 
-  // Build milestone reads for ALL campaigns (to compute total requested)
   const milestoneReads = useMemo(() => {
     if (!metas.data) return [];
 
     const reads: any[] = [];
     for (let i = 0; i < addresses.length; i++) {
-      const msCountIndex = i * 3 + 1; // title, milestoneCount, totalWithdrawn
+      const msCountIndex = i * 3 + 1;
       const msCount =
         metas.data[msCountIndex]?.status === "success"
           ? Number(metas.data[msCountIndex].result ?? 0n)
@@ -157,7 +153,7 @@ export default function HomePage() {
     }
 
     const ms = cleaned.map((s) => parseUnits(s, 6));
-    const votingPeriodSeconds = BigInt(votingPeriodHours) * 60n * 60n;
+    const votingPeriodSeconds = votingPeriodHours * 60 * 60;
 
     try {
       await writeContractAsync({
@@ -169,8 +165,8 @@ export default function HomePage() {
           description,
           ms,
           votingPeriodSeconds,
-          BigInt(quorumBps),
-          BigInt(passBps),
+          quorumBps,
+          passBps,
         ],
       });
 
@@ -192,59 +188,61 @@ export default function HomePage() {
   return (
     <main className="page">
       <section className="card hero">
-        <div className="row" style={{ justifyContent: "space-between" }}>
+        <div className="row spread">
           <div>
             <h1 className="hero-title">Fundarc</h1>
             <div className="subtext">
               Stablecoin-native, milestone-based crowdfunding on Arc Testnet.
             </div>
           </div>
-          <div className="row">
+          <div className="actions">
+            <Link className="btn btn-primary" href="/dashboard">
+              <BarChart3 size={16} />
+              Fundarc metrics
+            </Link>
             <button className="btn" type="button" onClick={refreshList}>
-              Refresh list
+              <RefreshCcw size={16} />
+              Refresh
             </button>
-            <a
-              className="btn"
-              href={explorerAddress(FACTORY)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Factory on ArcScan
+            <a className="btn" href={explorerAddress(FACTORY)} target="_blank" rel="noreferrer">
+              Factory <ExternalLink size={16} />
             </a>
           </div>
         </div>
 
-        <div className="hr-glow" style={{ marginTop: 14 }} />
-        <div className="row" style={{ marginTop: 12 }}>
+        <div className="divider" />
+        <div className="row">
           <span className="badge">USDC gas</span>
           <span className="badge">Milestone voting</span>
           <span className="badge">Refund safety</span>
         </div>
       </section>
 
-      <div className="grid-2" style={{ marginTop: 14 }}>
+      <div className="grid-2 section-gap">
         {/* CREATE */}
-        <section className="card" style={{ padding: 16 }}>
-          <h2>Create campaign</h2>
+        <section className="card section">
+          <div className="section-head">
+            <div className="section-copy">
+              <h2>Create campaign</h2>
+              <div className="subtext">Define funding tranches, voting rules, and campaign metadata.</div>
+            </div>
+          </div>
 
-          <label>Title</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} />
+          <div className="field">
+            <label>Title</label>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
 
-          <label>Description</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
+          <div className="field section-gap">
+            <label>Description</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+          </div>
 
-          <div style={{ marginTop: 12 }}>
+          <div className="section-gap">
             <h3 style={{ marginBottom: 8 }}>Milestones (USDC)</h3>
             <div className="stack">
               {milestones.map((m, idx) => (
-                <div
-                  key={idx}
-                  className="row"
-                  style={{ justifyContent: "space-between" }}
-                >
+                <div key={idx} className="row spread">
                   <input
                     value={m}
                     onChange={(e) => {
@@ -252,13 +250,11 @@ export default function HomePage() {
                       copy[idx] = e.target.value;
                       setMilestones(copy);
                     }}
-                    style={{ flex: 1 }}
+                    style={{ flex: 1, minWidth: 180 }}
                   />
                   <button
-                    className="btn"
-                    onClick={() =>
-                      setMilestones(milestones.filter((_, i) => i !== idx))
-                    }
+                    className="btn btn-sm"
+                    onClick={() => setMilestones(milestones.filter((_, i) => i !== idx))}
                     disabled={milestones.length <= 1}
                     type="button"
                   >
@@ -266,18 +262,15 @@ export default function HomePage() {
                   </button>
                 </div>
               ))}
-              <button
-                className="btn"
-                onClick={() => setMilestones([...milestones, "50"])}
-                type="button"
-              >
-                + add milestone
+              <button className="btn" onClick={() => setMilestones([...milestones, "50"])} type="button">
+                <Plus size={16} />
+                Add milestone
               </button>
             </div>
           </div>
 
-          <div className="grid-3" style={{ marginTop: 12 }}>
-            <div>
+          <div className="form-grid section-gap">
+            <div className="field">
               <label>Voting (hours)</label>
               <input
                 type="number"
@@ -285,64 +278,50 @@ export default function HomePage() {
                 onChange={(e) => setVotingPeriodHours(Number(e.target.value))}
               />
             </div>
-            <div>
+            <div className="field">
               <label>Quorum (bps)</label>
-              <input
-                type="number"
-                value={quorumBps}
-                onChange={(e) => setQuorumBps(Number(e.target.value))}
-              />
+              <input type="number" value={quorumBps} onChange={(e) => setQuorumBps(Number(e.target.value))} />
             </div>
-            <div>
+            <div className="field">
               <label>Pass (bps)</label>
-              <input
-                type="number"
-                value={passBps}
-                onChange={(e) => setPassBps(Number(e.target.value))}
-              />
+              <input type="number" value={passBps} onChange={(e) => setPassBps(Number(e.target.value))} />
             </div>
           </div>
 
-          <div className="actions" style={{ marginTop: 12 }}>
+          <div className="actions section-gap">
             <button
-              className="btn btn-primary"
+              className="btn btn-primary btn-lg btn-block"
               onClick={create}
               disabled={isPending || !address}
               type="button"
             >
-              {isPending
-                ? "Creating..."
-                : address
-                  ? "Create Campaign"
-                  : "Connect wallet to create"}
+              {isPending ? "Creating..." : address ? "Create Campaign" : "Connect wallet to create"}
             </button>
           </div>
         </section>
 
         {/* LIST */}
-        <section className="card" style={{ padding: 16 }}>
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <h2>Campaigns</h2>
+        <section className="card section">
+          <div className="section-head">
+            <div className="section-copy">
+              <h2>Campaigns</h2>
+              <div className="subtext">Browse active campaign contracts and funding progress.</div>
+            </div>
             <span className="badge">{n} total</span>
           </div>
 
-          <div className="row" style={{ marginTop: 10, justifyContent: "space-between" }}>
-            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                type="checkbox"
-                checked={showCompleted}
-                onChange={(e) => setShowCompleted(e.target.checked)}
-              />
+          <div className="row spread">
+            <label className="check-row">
+              <input type="checkbox" checked={showCompleted} onChange={(e) => setShowCompleted(e.target.checked)} />
               Show completed
             </label>
           </div>
 
-          <div className="hr-glow" style={{ margin: "10px 0 12px" }} />
+          <div className="divider" />
 
           <div className="stack">
             {(campaignAddrs.data ?? []).map((r, idx) => {
-              const addr =
-                r.status === "success" ? (r.result as `0x${string}`) : "";
+              const addr = r.status === "success" ? (r.result as `0x${string}`) : "";
               if (!addr) return <div key={idx} className="subtext">Loading…</div>;
 
               const titleIndex = idx * 3;
@@ -365,13 +344,13 @@ export default function HomePage() {
               if (!showCompleted && isCompleted) return null;
 
               return (
-                <div key={addr} className="kv">
+                <div key={addr} className="kv campaign-item">
                   <div style={{ minWidth: 0 }}>
                     <div className="k">
                       {name}{" "}
-                      {isCompleted ? <span className="badge" style={{ marginLeft: 8 }}>Completed</span> : null}
+                      {isCompleted ? <span className="badge badge-success" style={{ marginLeft: 8 }}>Completed</span> : null}
                     </div>
-                    <div className="v mono" style={{ fontSize: 12 }}>
+                    <div className="v mono address-line">
                       {addr}
                     </div>
                     <div className="subtext" style={{ marginTop: 4 }}>
@@ -380,12 +359,12 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  <div className="row">
-                    <Link className="btn btn-primary" href={`/campaign/${addr}`}>
+                  <div className="actions">
+                    <Link className="btn btn-primary btn-sm" href={`/campaign/${addr}`}>
                       Open
                     </Link>
-                    <a className="btn" href={explorerAddress(addr)} target="_blank" rel="noreferrer">
-                      ArcScan
+                    <a className="btn btn-sm" href={explorerAddress(addr)} target="_blank" rel="noreferrer">
+                      ArcScan <ExternalLink size={16} />
                     </a>
                   </div>
                 </div>

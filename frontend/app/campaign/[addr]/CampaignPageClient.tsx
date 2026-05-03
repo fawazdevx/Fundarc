@@ -13,6 +13,15 @@ import {
 } from "wagmi";
 import { fundarcCampaignAbi } from "@/src/abi/campaign";
 import { erc20Abi } from "@/src/abi/erc20";
+import {
+  ExternalLink,
+  RefreshCcw,
+  ThumbsDown,
+  ThumbsUp,
+  Flag,
+  Send,
+  Wallet,
+} from "lucide-react";
 
 const USDC = process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`;
 const EXPLORER = process.env.NEXT_PUBLIC_EXPLORER!;
@@ -39,7 +48,7 @@ type MilestoneObj = {
   amount: bigint;
   voteStart: bigint;
   voteEnd: bigint;
-  state: number; // wagmi may return number or bigint; we handle below
+  state: number;
   evidenceHash: `0x${string}`;
   yesWeight: bigint;
   noWeight: bigint;
@@ -295,11 +304,13 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
   return (
     <main className="page">
       <section className="card hero">
-        <div className="row" style={{ justifyContent: "space-between" }}>
+        <div className="row spread">
           <div>
-            <h1 className="hero-title">{title ?? (baseLoading ? "Loading…" : "Campaign")}</h1>
+            <h1 className="hero-title">
+              {title ?? (baseLoading ? "Loading…" : "Campaign")}
+            </h1>
             <div className="subtext">{description ?? ""}</div>
-            <div className="v" style={{ marginTop: 6, fontWeight: 700 }}>
+            <div className="metric-value">
               Total requested:{" "}
               {milestoneCount === 0
                 ? baseLoading
@@ -311,30 +322,34 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
             </div>
           </div>
 
-          <div className="row">
+          <div className="actions">
             <button className="btn" type="button" onClick={refetchAll}>
-              Refresh data
+              <RefreshCcw size={16} />
+              Refresh
             </button>
             <a className="btn" href={addrUrl(campaign)} target="_blank" rel="noreferrer">
-              Campaign on ArcScan
+              Campaign <ExternalLink size={16} />
             </a>
             {creator ? (
               <a className="btn" href={addrUrl(creator)} target="_blank" rel="noreferrer">
-                Creator
+                Creator <ExternalLink size={16} />
               </a>
             ) : null}
           </div>
         </div>
       </section>
 
-      <div className="grid-2" style={{ marginTop: 14 }}>
-        <section className="card" style={{ padding: 16 }}>
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <h2>Live totals</h2>
+      <div className="grid-2 section-gap">
+        <section className="card section">
+          <div className="section-head">
+            <div className="section-copy">
+              <h2>Live totals</h2>
+              <div className="subtext">Current funding, unlock, and wallet-specific balances.</div>
+            </div>
             <span className="badge mono">{campaign.slice(0, 10)}…</span>
           </div>
 
-          <div className="stack" style={{ marginTop: 10 }}>
+          <div className="stats-grid">
             <div className="kv">
               <div className="k">Total raised</div>
               <div className="v">{formatUnits(totalRaised, 6)} USDC</div>
@@ -353,47 +368,67 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
             </div>
             <div className="kv">
               <div className="k">My contributed</div>
-              <div className="v">{formatUnits((myContrib.data ?? 0n) as bigint, 6)} USDC</div>
+              <div className="v">
+                {formatUnits((myContrib.data ?? 0n) as bigint, 6)} USDC
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="card" style={{ padding: 16 }}>
-          <h2>Contribute (USDC)</h2>
-          <div className="subtext">Approve once, then contribute. Amount is in USDC.</div>
+        <section className="card section">
+          <div className="section-copy">
+            <h2>Contribute</h2>
+            <div className="subtext">Approve once, then contribute. Amount is in USDC.</div>
+          </div>
 
-          <div className="row" style={{ marginTop: 10 }}>
-            <div style={{ flex: 1 }}>
+          <div className="row align-end section-gap">
+            <div className="field" style={{ flex: 1, minWidth: 220 }}>
               <label>Amount</label>
               <input value={contribution} onChange={(e) => setContribution(e.target.value)} />
             </div>
-            <div style={{ marginTop: 22 }}>
-              <button className="btn btn-primary" onClick={approveAndContribute} disabled={isPending || !address}>
+            <div style={{ minWidth: 240, flex: "0 0 auto" }}>
+              <button
+                className="btn btn-primary btn-lg btn-block"
+                onClick={approveAndContribute}
+                disabled={isPending || !address}
+                type="button"
+              >
+                <Wallet size={18} />
                 {isPending ? "Pending..." : "Approve + Contribute"}
               </button>
             </div>
           </div>
 
-          <div className="hr-glow" style={{ margin: "14px 0" }} />
+          <div className="divider" />
 
           <h2>Refunds</h2>
-          <div className="kv" style={{ marginTop: 10 }}>
+          <div className="kv section-gap">
             <div className="k">My refundable</div>
             <div className="v">{formatUnits((myRefundable.data ?? 0n) as bigint, 6)} USDC</div>
           </div>
-          <button className="btn" onClick={claimRefund} disabled={isPending} style={{ marginTop: 10 }}>
+          <button
+            className="btn btn-warn btn-lg btn-block"
+            onClick={claimRefund}
+            disabled={isPending}
+            style={{ marginTop: 12 }}
+            type="button"
+          >
+            <Flag size={18} />
             Claim refund
           </button>
         </section>
       </div>
 
-      <section className="card" style={{ padding: 16, marginTop: 14 }}>
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          <h2>Milestones</h2>
+      <section className="card section section-gap">
+        <div className="section-head">
+          <div className="section-copy">
+            <h2>Milestones</h2>
+            <div className="subtext">Review status, votes, and creator evidence for each tranche.</div>
+          </div>
           <span className="badge">count: {milestoneCount}</span>
         </div>
 
-        <div className="hr-glow" style={{ margin: "10px 0 14px" }} />
+        <div className="divider" />
 
         <div className="stack">
           {milestoneCount === 0 ? (
@@ -403,10 +438,12 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
           ) : (
             (milestones.data ?? []).map((r, idx) => {
               if (r.status !== "success") {
-                return <div key={idx} className="subtext">Milestone #{idx} failed to load.</div>;
+                return (
+                  <div key={idx} className="subtext">
+                    Milestone #{idx} failed to load.
+                  </div>
+                );
               }
-
-              
 
               const m = r.result as unknown as MilestoneObj;
 
@@ -424,12 +461,10 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
 
               const canVote = isVotingLive;
               const canFinalize = hasVotingEnded;
-              const voteEndNum = Number(voteEnd ?? 0n);
 
               const secondsLeft = Math.max(0, Number(voteEnd) - now);
 
               const canSubmitMilestone = isCreator && !votingConfigured;
-              
 
               let statusText = "Voting not started.";
               if (!votingConfigured) {
@@ -437,14 +472,14 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
                   ? "Voting not started. Submit milestone to open voting."
                   : "Voting not started. Waiting for creator to submit.";
               } else if (isVotingLive) {
-                statusText = `Voting is LIVE (ends in ${secondsToHuman(Number(voteEnd - BigInt(now)))}).`;
+                statusText = `Voting is LIVE (ends in ${secondsToHuman(secondsLeft)}).`;
               } else if (hasVotingEnded) {
                 statusText = "Voting ended. Finalize to apply result.";
               }
 
               return (
-                <div key={idx} className="card" style={{ padding: 14 }}>
-                  <div className="row" style={{ justifyContent: "space-between" }}>
+                <div key={idx} className="panel milestone-card">
+                  <div className="row spread">
                     <div style={{ maxWidth: 720 }}>
                       <div className="badge">Milestone #{idx}</div>
 
@@ -454,14 +489,16 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
                           : "Deliverable milestone — review proof before voting."}
                       </div>
 
-                      <div style={{ marginTop: 10 }}>
+                      <div className="section-gap">
                         <div className="subtext">Amount</div>
-                        <div className="mono" style={{ fontSize: 18, fontWeight: 800 }}>
+                        <div className="mono metric-value">
                           {formatUnits(amount, 6)} USDC
                         </div>
                       </div>
 
-                      <div className="subtext" style={{ marginTop: 8 }}>{statusText}</div>
+                      <div className="subtext" style={{ marginTop: 8 }}>
+                        {statusText}
+                      </div>
 
                       {votingConfigured ? (
                         <div className="subtext" style={{ marginTop: 6 }}>
@@ -483,24 +520,45 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
                     </div>
                   </div>
 
-                  <div className="actions" style={{ marginTop: 12 }}>
-                    <button className="btn btn-primary" onClick={() => vote(idx, true)} disabled={isPending || !canVote}>
+                  <div className="actions section-gap">
+                    <button
+                      className="btn btn-yes btn-lg"
+                      onClick={() => vote(idx, true)}
+                      disabled={isPending || !canVote}
+                      title={!canVote ? "Voting is not live." : ""}
+                    >
+                      <ThumbsUp size={18} />
                       Vote YES
                     </button>
-                    <button className="btn" onClick={() => vote(idx, false)} disabled={isPending || !canVote}>
+
+                    <button
+                      className="btn btn-no btn-lg"
+                      onClick={() => vote(idx, false)}
+                      disabled={isPending || !canVote}
+                      title={!canVote ? "Voting is not live." : ""}
+                    >
+                      <ThumbsDown size={18} />
                       Vote NO
                     </button>
-                    <button className="btn" onClick={() => finalize(idx)} disabled={isPending || !canFinalize} 
-                      title={!canFinalize ? `Finalize available in ${secondsToHuman(secondsLeft)}` : ""} > 
+
+                    <button
+                      className="btn btn-primary btn-lg"
+                      onClick={() => finalize(idx)}
+                      disabled={isPending || !canFinalize}
+                      title={!canFinalize ? `Finalize available in ${secondsToHuman(secondsLeft)}` : ""}
+                    >
+                      <Send size={18} />
                       {canFinalize ? "Finalize" : `Finalize (in ${secondsToHuman(secondsLeft)})`}
                     </button>
                   </div>
 
                   {isCreator ? (
                     <>
-                      <div className="hr-glow" style={{ margin: "14px 0" }} />
-                      <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-end" }}>
-                        <div style={{ flex: 1, minWidth: 260 }}>
+                      <div className="divider" />
+                      <div
+                        className="row spread align-end"
+                      >
+                        <div className="field" style={{ flex: 1, minWidth: 260 }}>
                           <label>Evidence hash (creator)</label>
                           <input
                             value={evidenceHash}
@@ -510,11 +568,12 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
                         </div>
                         <div>
                           <button
-                            className="btn btn-primary"
+                            className="btn btn-primary btn-lg"
                             onClick={submitMilestone}
                             disabled={isPending || !canSubmitMilestone}
                           >
-                            Submit milestone (open voting)
+                            <Send size={18} />
+                            Submit milestone
                           </button>
                         </div>
                       </div>
@@ -527,15 +586,19 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
         </div>
       </section>
 
-      <section className="card" style={{ padding: 16, marginTop: 14 }}>
-        <h2>Withdraw unlocked (creator)</h2>
-        <div className="row" style={{ marginTop: 10 }}>
-          <div style={{ flex: 1 }}>
+      <section className="card section section-gap">
+        <div className="section-copy">
+          <h2>Withdraw unlocked (creator)</h2>
+          <div className="subtext">Withdraw funds after successful milestone votes.</div>
+        </div>
+        <div className="row align-end section-gap">
+          <div className="field" style={{ flex: 1 }}>
             <label>Amount</label>
             <input value={withdrawAmt} onChange={(e) => setWithdrawAmt(e.target.value)} />
           </div>
-          <div style={{ marginTop: 22 }}>
-            <button className="btn" onClick={withdraw} disabled={isPending}>
+          <div>
+            <button className="btn btn-primary btn-lg" onClick={withdraw} disabled={isPending}>
+              <Wallet size={18} />
               Withdraw
             </button>
           </div>

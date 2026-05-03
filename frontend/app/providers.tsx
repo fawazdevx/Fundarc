@@ -15,15 +15,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={qc}>
-        <RainbowKitProvider
-          initialChain={arcTestnet}
+        <RainbowKitProvider initialChain={arcTestnet} 
           theme={darkTheme({
-            accentColor: "#a855f7",
-            accentColorForeground: "#0b0615",
-            borderRadius: "large",
-            overlayBlur: "small",
-          })}
-        >
+            accentColor: '#7b3fe4',
+            accentColorForeground: 'white',
+            borderRadius: 'medium',
+          })} modalSize="wide">
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>

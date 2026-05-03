@@ -7,6 +7,11 @@ import { defineChain } from "viem";
 const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID);
 const rpcUrl = process.env.NEXT_PUBLIC_ARC_RPC_URL!;
 const explorer = process.env.NEXT_PUBLIC_EXPLORER!;
+const walletConnectProjectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID;
+
+if (!walletConnectProjectId) {
+  throw new Error("NEXT_PUBLIC_WC_PROJECT_ID is required.");
+}
 
 export const arcTestnet = defineChain({
   id: chainId,
@@ -23,8 +28,7 @@ export const arcTestnet = defineChain({
 
 export const wagmiConfig = getDefaultConfig({
   appName: "Fundarc",
-  // In wagmi config
-  projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID, // <-- replace with env if you want
+  projectId: walletConnectProjectId,
   chains: [arcTestnet],
   transports: {
     [arcTestnet.id]: http(rpcUrl),
