@@ -1,0 +1,19 @@
+<svg width="1200" height="1200" viewBox="0 0 1200 1200" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Fundarc logo</title>
+  <desc id="desc">A milestone crowdfunding logo mark for Fundarc with an arc, shield, and stablecoin symbol.</desc>
+  <rect width="1200" height="1200" rx="260" fill="#07130F"/>
+  <circle cx="600" cy="600" r="482" fill="#0E241B"/>
+  <circle cx="600" cy="600" r="482" stroke="#9BE7C3" stroke-opacity="0.18" stroke-width="3"/>
+  <path d="M286 640C331 473 453 362 600 362C747 362 869 473 914 640" stroke="#36D399" stroke-width="78" stroke-linecap="round"/>
+  <path d="M350 641C391 529 484 460 600 460C716 460 809 529 850 641" stroke="#F6C860" stroke-width="50" stroke-linecap="round"/>
+  <path d="M600 728C691 728 765 654 765 563C765 472 691 398 600 398C509 398 435 472 435 563C435 654 509 728 600 728Z" fill="#07130F"/>
+  <path d="M600 729C493 689 424 599 424 486V419L600 348L776 419V486C776 599 707 689 600 729Z" fill="#112C21"/>
+  <path d="M600 729C493 689 424 599 424 486V419L600 348L776 419V486C776 599 707 689 600 729Z" stroke="#9BE7C3" stroke-width="30" stroke-linejoin="round"/>
+  <path d="M533 558C533 605 567 635 623 635C673 635 705 611 705 572C705 530 675 514 623 504C590 498 575 491 575 474C575 459 589 449 612 449C638 449 653 461 657 482H698C692 438 661 412 619 406V367H578V407C531 416 501 443 501 480C501 522 531 542 583 552C616 558 630 564 630 581C630 596 616 604 590 604C561 604 543 587 539 558H533Z" fill="#F6C860"/>
+  <path d="M578 371H622V407C668 414 699 442 706 486H651C646 468 633 458 612 458C594 458 584 465 584 475C584 486 595 491 625 496C679 506 714 526 714 572C714 615 683 641 630 646V686H578V645C525 638 492 606 488 558H542C548 582 565 595 590 595C610 595 621 590 621 581C621 571 611 566 581 560C526 550 492 526 492 480C492 440 525 413 578 407V371Z" stroke="#07130F" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M304 786H896" stroke="#9BE7C3" stroke-opacity="0.72" stroke-width="32" stroke-linecap="round"/>
+  <circle cx="398" cy="786" r="38" fill="#36D399"/>
+  <circle cx="600" cy="786" r="38" fill="#F6C860"/>
+  <circle cx="802" cy="786" r="38" fill="#36D399"/>
+  <path d="M406 896H794" stroke="#F6C860" stroke-opacity="0.72" stroke-width="24" stroke-linecap="round"/>
+</svg>

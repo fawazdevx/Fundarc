@@ -1,5 +1,7 @@
 # Fundarc
 
+![Demo](frontend/public/brand/fundarc-banner.svg)
+
 Fundarc is a stablecoin-native crowdfunding dApp built for Arc Testnet. It lets creators raise USDC through milestone-based campaigns, while funders keep governance power over when each tranche of funds is unlocked.
 
 Instead of releasing all funds at once, Fundarc splits a campaign into milestones. Contributors fund the campaign with USDC, creators submit milestone evidence, contributors vote with contribution-weighted voting power, and only approved milestones unlock funds for the creator. If a campaign is canceled or fails a milestone vote, funders can claim refunds.
