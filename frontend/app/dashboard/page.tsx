@@ -368,8 +368,7 @@ export default function DashboardPage() {
       <section className="card section section-gap">
         <h2>Notes</h2>
         <div className="subtext">
-          This dashboard queries logs directly from the RPC (no backend). If it gets slow later, move this to an indexer
-          (Ponder/The Graph) and serve pre-aggregated daily stats.
+          This dashboard queries logs directly from the RPC.
         </div>
         <div className="subtext" style={{ marginTop: 8 }}>
           Factory: <span className="mono">{FACTORY}</span>
