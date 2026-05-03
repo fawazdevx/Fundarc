@@ -581,4 +581,10 @@ Open an issue or reach out 👇
 
 ## License
 
+MIT License
+
+Copyright (c) 2026 Fawaz Oyebode
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+...
 
