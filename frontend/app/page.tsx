@@ -22,6 +22,8 @@ import { BarChart3, ExternalLink, Plus, RefreshCcw } from "lucide-react";
 
 const FACTORY = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`;
 const EXPLORER = process.env.NEXT_PUBLIC_EXPLORER!;
+const CAMPAIGN_CREATION_MAINTENANCE = true;
+const MIN_RECOMMENDED_CAMPAIGN_USDC = 100;
 
 function explorerAddress(addr: string) {
   return `${EXPLORER}/address/${addr}`;
@@ -153,6 +155,11 @@ export default function HomePage() {
   }, [addresses, metas.data, milestonesAll.data]);
 
   async function create() {
+    if (CAMPAIGN_CREATION_MAINTENANCE) {
+      toast.error("Campaign creation is temporarily paused for maintenance.");
+      return;
+    }
+
     if (!address) {
       toast.error("Connect your wallet first.");
       return;
@@ -237,83 +244,108 @@ export default function HomePage() {
       <div className="grid-2 section-gap">
         {/* CREATE */}
         <section className="card section">
-          <div className="section-head">
-            <div className="section-copy">
-              <h2>Create campaign</h2>
-              <div className="subtext">Define funding tranches, voting rules, and campaign metadata.</div>
+          {CAMPAIGN_CREATION_MAINTENANCE ? (
+            <div className="maintenance-panel">
+              <span className="badge badge-warn">Maintenance mode</span>
+              <div className="section-copy">
+                <h2>Campaign creation is paused</h2>
+                <div className="subtext">
+                  Fundarc is temporarily blocking new campaign creation while anti-spam and creator reputation
+                  safeguards are being upgraded. Existing campaigns remain visible for review.
+                </div>
+              </div>
+              <div className="kv">
+                <div>
+                  <div className="k">Upcoming creation minimum</div>
+                  <div className="v">{MIN_RECOMMENDED_CAMPAIGN_USDC} USDC</div>
+                </div>
+                <div className="subtext">
+                  This minimum will make tiny campaign farming much harder and keep reputation tied to meaningful
+                  funding goals.
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="section-head">
+                <div className="section-copy">
+                  <h2>Create campaign</h2>
+                  <div className="subtext">Define funding tranches, voting rules, and campaign metadata.</div>
+                </div>
+              </div>
 
-          <div className="field">
-            <label>Title</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} />
-          </div>
+              <div className="field">
+                <label>Title</label>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} />
+              </div>
 
-          <div className="field section-gap">
-            <label>Description</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-          </div>
+              <div className="field section-gap">
+                <label>Description</label>
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+              </div>
 
-          <div className="section-gap">
-            <h3 style={{ marginBottom: 8 }}>Milestones (USDC)</h3>
-            <div className="stack">
-              {milestones.map((m, idx) => (
-                <div key={idx} className="row spread">
-                  <input
-                    value={m}
-                    onChange={(e) => {
-                      const copy = [...milestones];
-                      copy[idx] = e.target.value;
-                      setMilestones(copy);
-                    }}
-                    style={{ flex: 1, minWidth: 180 }}
-                  />
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => setMilestones(milestones.filter((_, i) => i !== idx))}
-                    disabled={milestones.length <= 1}
-                    type="button"
-                  >
-                    remove
+              <div className="section-gap">
+                <h3 style={{ marginBottom: 8 }}>Milestones (USDC)</h3>
+                <div className="stack">
+                  {milestones.map((m, idx) => (
+                    <div key={idx} className="row spread">
+                      <input
+                        value={m}
+                        onChange={(e) => {
+                          const copy = [...milestones];
+                          copy[idx] = e.target.value;
+                          setMilestones(copy);
+                        }}
+                        style={{ flex: 1, minWidth: 180 }}
+                      />
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => setMilestones(milestones.filter((_, i) => i !== idx))}
+                        disabled={milestones.length <= 1}
+                        type="button"
+                      >
+                        remove
+                      </button>
+                    </div>
+                  ))}
+                  <button className="btn btn-primary" onClick={() => setMilestones([...milestones, "50"])} type="button">
+                    <Plus size={16} />
+                    Add milestone
                   </button>
                 </div>
-              ))}
-              <button className="btn btn-primary" onClick={() => setMilestones([...milestones, "50"])} type="button">
-                <Plus size={16} />
-                Add milestone
-              </button>
-            </div>
-          </div>
+              </div>
 
-          <div className="form-grid section-gap">
-            <div className="field">
-              <label>Voting (hours)</label>
-              <input
-                type="number"
-                value={votingPeriodHours}
-                onChange={(e) => setVotingPeriodHours(Number(e.target.value))}
-              />
-            </div>
-            <div className="field">
-              <label>Quorum (bps)</label>
-              <input type="number" value={quorumBps} onChange={(e) => setQuorumBps(Number(e.target.value))} />
-            </div>
-            <div className="field">
-              <label>Pass (bps)</label>
-              <input type="number" value={passBps} onChange={(e) => setPassBps(Number(e.target.value))} />
-            </div>
-          </div>
+              <div className="form-grid section-gap">
+                <div className="field">
+                  <label>Voting (hours)</label>
+                  <input
+                    type="number"
+                    value={votingPeriodHours}
+                    onChange={(e) => setVotingPeriodHours(Number(e.target.value))}
+                  />
+                </div>
+                <div className="field">
+                  <label>Quorum (bps)</label>
+                  <input type="number" value={quorumBps} onChange={(e) => setQuorumBps(Number(e.target.value))} />
+                </div>
+                <div className="field">
+                  <label>Pass (bps)</label>
+                  <input type="number" value={passBps} onChange={(e) => setPassBps(Number(e.target.value))} />
+                </div>
+              </div>
 
-          <div className="actions section-gap">
-            <button
-              className="btn btn-primary btn-lg btn-block"
-              onClick={create}
-              disabled={isPending || !address}
-              type="button"
-            >
-              {isPending ? "Creating..." : address ? "Create Campaign" : "Connect wallet to create"}
-            </button>
-          </div>
+              <div className="actions section-gap">
+                <button
+                  className="btn btn-primary btn-lg btn-block"
+                  onClick={create}
+                  disabled={isPending || !address}
+                  type="button"
+                >
+                  {isPending ? "Creating..." : address ? "Create Campaign" : "Connect wallet to create"}
+                </button>
+              </div>
+            </>
+          )}
         </section>
 
         {/* LIST */}

@@ -365,6 +365,17 @@ select {
   text-decoration: none;
 }
 
+.maintenance-panel {
+  display: grid;
+  gap: 16px;
+  min-height: 360px;
+  align-content: center;
+}
+
+.maintenance-panel .kv {
+  align-items: flex-start;
+}
+
 .address-line {
   max-width: 100%;
   overflow-wrap: anywhere;

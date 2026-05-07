@@ -24,11 +24,7 @@ contract UpgradeFactoryFeeEvent is Script {
 
         // 2) UUPS upgrade (no init)
         (bool ok1, bytes memory ret1) = factoryProxy.call(
-            abi.encodeWithSignature(
-                "upgradeToAndCall(address,bytes)",
-                address(newFactoryImpl),
-                bytes("")
-            )
+            abi.encodeWithSignature("upgradeToAndCall(address,bytes)", address(newFactoryImpl), bytes(""))
         );
         require(ok1, _getRevertMsg(ret1));
 

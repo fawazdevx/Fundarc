@@ -9,6 +9,7 @@ import { fundarcFactoryAbi } from "@/src/abi/factory";
 const FACTORY = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`;
 
 const META_READS_PER_CAMPAIGN = 8;
+const MIN_REPUTATION_CAMPAIGN_GOAL = 100n * 1_000_000n;
 
 export type ReputationCampaign = {
   address: `0x${string}`;
@@ -24,6 +25,7 @@ export type ReputationCampaign = {
   rejectedMilestones: number;
   submittedMilestones: number;
   requestedAmount: bigint;
+  qualifiesForReputation: boolean;
 };
 
 export type CreatorReputation = {
@@ -247,6 +249,7 @@ export function useCreatorReputation(targetCreator?: string) {
         rejectedMilestones,
         submittedMilestones,
         requestedAmount,
+        qualifiesForReputation: requestedAmount >= MIN_REPUTATION_CAMPAIGN_GOAL,
       });
     }
 
@@ -263,19 +266,23 @@ export function useCreatorReputation(targetCreator?: string) {
 
     return Array.from(byCreator, ([creator, creatorCampaigns]) => {
       const baseStats = creatorCampaigns.reduce(
-        (acc, campaign) => ({
-          campaignsCreated: acc.campaignsCreated + 1,
-          completedCampaigns: acc.completedCampaigns + (campaign.campaignState === 3 ? 1 : 0),
-          activeCampaigns: acc.activeCampaigns + (campaign.campaignState === 0 ? 1 : 0),
-          failedCampaigns: acc.failedCampaigns + (campaign.campaignState === 2 ? 1 : 0),
-          canceledCampaigns: acc.canceledCampaigns + (campaign.campaignState === 1 ? 1 : 0),
-          approvedMilestones: acc.approvedMilestones + campaign.approvedMilestones,
-          rejectedMilestones: acc.rejectedMilestones + campaign.rejectedMilestones,
-          submittedMilestones: acc.submittedMilestones + campaign.submittedMilestones,
-          totalRaised: acc.totalRaised + campaign.totalRaised,
-          totalUnlocked: acc.totalUnlocked + campaign.unlockedAmount,
-          totalRefunded: acc.totalRefunded + campaign.totalRefunded,
-        }),
+        (acc, campaign) => {
+          const qualifies = campaign.qualifiesForReputation;
+
+          return {
+            campaignsCreated: acc.campaignsCreated + (qualifies ? 1 : 0),
+            completedCampaigns: acc.completedCampaigns + (qualifies && campaign.campaignState === 3 ? 1 : 0),
+            activeCampaigns: acc.activeCampaigns + (qualifies && campaign.campaignState === 0 ? 1 : 0),
+            failedCampaigns: acc.failedCampaigns + (campaign.campaignState === 2 ? 1 : 0),
+            canceledCampaigns: acc.canceledCampaigns + (campaign.campaignState === 1 ? 1 : 0),
+            approvedMilestones: acc.approvedMilestones + (qualifies ? campaign.approvedMilestones : 0),
+            rejectedMilestones: acc.rejectedMilestones + campaign.rejectedMilestones,
+            submittedMilestones: acc.submittedMilestones + (qualifies ? campaign.submittedMilestones : 0),
+            totalRaised: acc.totalRaised + (qualifies ? campaign.totalRaised : 0n),
+            totalUnlocked: acc.totalUnlocked + (qualifies ? campaign.unlockedAmount : 0n),
+            totalRefunded: acc.totalRefunded + campaign.totalRefunded,
+          };
+        },
         {
           campaignsCreated: 0,
           completedCampaigns: 0,

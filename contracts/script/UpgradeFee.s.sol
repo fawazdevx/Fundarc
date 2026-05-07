@@ -6,8 +6,11 @@ import {FundarcCampaign} from "../src/FundarcCampaign.sol";
 import {FundarcFactory} from "../src/FundarcFactory.sol";
 
 contract UpgradeFee is Script {
+    uint256 internal constant DEFAULT_MIN_CAMPAIGN_GOAL = 100 * 1e6;
+
     function run() external {
         address factoryProxy = vm.envAddress("FACTORY_PROXY");
+        uint256 minCampaignGoal = vm.envOr("MIN_CAMPAIGN_GOAL", DEFAULT_MIN_CAMPAIGN_GOAL);
 
         vm.startBroadcast();
 
@@ -28,30 +31,30 @@ contract UpgradeFee is Script {
 
         // 2) Upgrade proxy -> new factory impl (no re-init)
         (bool ok1, bytes memory ret1) = factoryProxy.call(
-            abi.encodeWithSignature(
-                "upgradeToAndCall(address,bytes)",
-                address(newFactoryImpl),
-                bytes("")
-            )
+            abi.encodeWithSignature("upgradeToAndCall(address,bytes)", address(newFactoryImpl), bytes(""))
         );
         require(ok1, _getRevertMsg(ret1));
 
         // 3) Point factory to new campaign impl
-        (bool ok2, bytes memory ret2) = factoryProxy.call(
-            abi.encodeWithSignature(
-                "setCampaignImplementation(address)",
-                address(newCampaignImpl)
-            )
-        );
+        (bool ok2, bytes memory ret2) =
+            factoryProxy.call(abi.encodeWithSignature("setCampaignImplementation(address)", address(newCampaignImpl)));
         require(ok2, _getRevertMsg(ret2));
 
-        // 4) Post-check: confirm it updated
+        // 4) Enforce a minimum total milestone goal for new campaigns.
+        (bool ok3, bytes memory ret3) =
+            factoryProxy.call(abi.encodeWithSignature("setMinimumCampaignGoal(uint256)", minCampaignGoal));
+        require(ok3, _getRevertMsg(ret3));
+
+        // 5) Post-check: confirm it updated
         address implNow = FundarcFactory(factoryProxy).campaignImplementation();
         require(implNow == address(newCampaignImpl), "CAMPAIGN_IMPL_NOT_UPDATED");
+        uint256 minGoalNow = FundarcFactory(factoryProxy).minimumCampaignGoal();
+        require(minGoalNow == minCampaignGoal, "MIN_GOAL_NOT_UPDATED");
 
         vm.stopBroadcast();
 
         console2.log("campaignImplementation now:", implNow);
+        console2.log("minimumCampaignGoal now:", minGoalNow);
         console2.log("Upgrade complete.");
     }
 

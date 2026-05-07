@@ -2,7 +2,6 @@
 
 // contracts/src/FundarcFactory.sol
 
-
 pragma solidity ^0.8.24;
 
 import {Initializable} from "openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -18,6 +17,7 @@ import {IERC20Minimal} from "./interfaces/IERC20Minimal.sol";
 contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     event CampaignCreated(address indexed creator, address indexed campaign, uint256 indexed campaignId);
     event FeeConfigUpdated(uint16 feeBps, address feeTreasury);
+    event MinimumCampaignGoalUpdated(uint256 minimumCampaignGoal);
 
     /// @notice Emitted whenever protocol fees are collected.
     /// @param campaign The campaign (msg.sender) that paid the fee.
@@ -32,6 +32,7 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
     uint256 public totalFeesCollected;
 
     address[] public campaigns;
+    uint256 public minimumCampaignGoal;
 
     function initialize(
         address _owner,
@@ -77,6 +78,11 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
         emit FeeConfigUpdated(_feeBps, _feeTreasury);
     }
 
+    function setMinimumCampaignGoal(uint256 _minimumCampaignGoal) external onlyOwner {
+        minimumCampaignGoal = _minimumCampaignGoal;
+        emit MinimumCampaignGoalUpdated(_minimumCampaignGoal);
+    }
+
     function takeFee(uint256 feeAmount) external nonReentrant returns (bool) {
         if (feeAmount == 0) return true;
 
@@ -95,19 +101,18 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
         uint16 quorumBps,
         uint16 passBps
     ) external nonReentrant returns (address campaign) {
+        uint256 totalGoal = 0;
+        for (uint256 i = 0; i < milestoneAmounts.length; i++) {
+            totalGoal += uint256(milestoneAmounts[i]);
+        }
+        require(totalGoal >= minimumCampaignGoal, "GOAL_TOO_LOW");
+
         campaign = Clones.clone(campaignImplementation);
 
-        FundarcCampaign(campaign).initialize(
-            msg.sender,
-            usdc,
-            address(this),
-            title,
-            description,
-            milestoneAmounts,
-            votingPeriod,
-            quorumBps,
-            passBps
-        );
+        FundarcCampaign(campaign)
+            .initialize(
+                msg.sender, usdc, address(this), title, description, milestoneAmounts, votingPeriod, quorumBps, passBps
+            );
 
         campaigns.push(campaign);
         emit CampaignCreated(msg.sender, campaign, campaigns.length - 1);

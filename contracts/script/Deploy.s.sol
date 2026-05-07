@@ -22,10 +22,8 @@ contract Deploy is Script {
         FundarcCampaign campaignImpl = new FundarcCampaign();
         FundarcFactory factoryImpl = new FundarcFactory();
 
-        bytes memory initData = abi.encodeCall(
-            FundarcFactory.initialize,
-            (owner, usdc, address(campaignImpl), feeBps, feeTreasury)
-        );
+        bytes memory initData =
+            abi.encodeCall(FundarcFactory.initialize, (owner, usdc, address(campaignImpl), feeBps, feeTreasury));
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(factoryImpl), initData);
 

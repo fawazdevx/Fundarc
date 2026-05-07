@@ -33,4 +33,5 @@ export const fundarcFactoryAbi = [
   { type: "function", name: "feeBps", stateMutability: "view", inputs: [], outputs: [{ type: "uint16" }] },
   { type: "function", name: "feeTreasury", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
   { type: "function", name: "totalFeesCollected", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "minimumCampaignGoal", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
 ] as const;

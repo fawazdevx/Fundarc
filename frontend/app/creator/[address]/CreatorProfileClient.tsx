@@ -85,6 +85,11 @@ export default function CreatorProfileClient({ address }: { address: string }) {
                     <span className={`badge ${campaign.campaignState === 3 ? "badge-success" : ""}`} style={{ marginLeft: 8 }}>
                       {stateLabel(campaign.campaignState)}
                     </span>
+                    {!campaign.qualifiesForReputation ? (
+                      <span className="badge badge-warn" style={{ marginLeft: 8 }}>
+                        Below reputation minimum
+                      </span>
+                    ) : null}
                   </div>
                   <div className="v mono address-line">{campaign.address}</div>
                   <div className="subtext" style={{ marginTop: 4 }}>
