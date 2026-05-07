@@ -15,6 +15,8 @@ import {FundarcCampaign} from "./FundarcCampaign.sol";
 import {IERC20Minimal} from "./interfaces/IERC20Minimal.sol";
 
 contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+    uint256 public constant DEFAULT_MINIMUM_CAMPAIGN_GOAL = 100 * 1e6;
+
     event CampaignCreated(address indexed creator, address indexed campaign, uint256 indexed campaignId);
     event FeeConfigUpdated(uint16 feeBps, address feeTreasury);
     event MinimumCampaignGoalUpdated(uint256 minimumCampaignGoal);
@@ -56,7 +58,9 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
 
         feeBps = _feeBps;
         feeTreasury = _feeTreasury;
+        minimumCampaignGoal = DEFAULT_MINIMUM_CAMPAIGN_GOAL;
         emit FeeConfigUpdated(_feeBps, _feeTreasury);
+        emit MinimumCampaignGoalUpdated(DEFAULT_MINIMUM_CAMPAIGN_GOAL);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
