@@ -1,6 +1,15 @@
 // src/abi/campaign.ts
 
 export const fundarcCampaignAbi = [
+  {
+    type: "event",
+    name: "Contributed",
+    inputs: [
+      { indexed: true, name: "funder", type: "address" },
+      { indexed: false, name: "amount", type: "uint256" },
+    ],
+  },
+
   { type: "function", name: "title", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
   { type: "function", name: "description", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
   { type: "function", name: "creator", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },

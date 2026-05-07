@@ -306,6 +306,20 @@ select {
   align-items: flex-start;
 }
 
+.contributor-list {
+  display: grid;
+  gap: 10px;
+}
+
+.contributor-item {
+  align-items: flex-start;
+}
+
+.contributor-item .v {
+  text-align: right;
+  white-space: nowrap;
+}
+
 .address-line {
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -524,7 +538,7 @@ input[type="checkbox"] {
   color: var(--text);
 }
 
-[data-rk] button {
+[data-rk] button:not(.btn) {
   font: inherit;
   color: inherit;
   border: none;
@@ -533,7 +547,35 @@ input[type="checkbox"] {
   cursor: pointer;
 }
 
-[data-rk] button>div {
+[data-rk] .wallet-slot .btn-primary {
+  border: 1px solid rgba(45, 212, 191, 0.5);
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.95), rgba(245, 158, 11, 0.9));
+  color: #07100f;
+  padding: 10px 13px;
+  font-weight: 400;
+  font-size: 20px;
+  box-shadow: 0 12px 28px rgba(45, 212, 191, 0.16), 0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+[data-rk] button.btn-primary,
+[data-rk] a.btn-primary,
+button.btn-primary,
+a.btn-primary {
+  border-color: rgba(45, 212, 191, 0.5) !important;
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.95), rgba(245, 158, 11, 0.9)) !important;
+  color: #07100f !important;
+  box-shadow: 0 12px 28px rgba(45, 212, 191, 0.16), 0 12px 32px rgba(0, 0, 0, 0.28) !important;
+}
+
+[data-rk] button.btn-primary:hover,
+[data-rk] a.btn-primary:hover,
+button.btn-primary:hover,
+a.btn-primary:hover {
+  border-color: rgba(45, 212, 191, 0.72) !important;
+  background: linear-gradient(135deg, #2dd4bf, #f59e0b) !important;
+}
+
+[data-rk] button:not(.btn)>div {
   border-radius: var(--radius-md) !important;
 }
 
@@ -585,5 +627,10 @@ input[type="checkbox"] {
   .kv {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .contributor-item .v {
+    text-align: left;
+    white-space: normal;
   }
 }

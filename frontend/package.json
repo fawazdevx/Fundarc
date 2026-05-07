@@ -16,6 +16,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@arcnames/sdk": "^0.2.0",
+    "@arcnames/sdk-react": "^0.2.0",
     "@netlify/plugin-nextjs": "^5.15.10",
     "@rainbow-me/rainbowkit": "^2.2.10",
     "@tanstack/react-query": "^5.99.2",

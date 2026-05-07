@@ -4,15 +4,18 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import { formatUnits, parseUnits } from "viem";
 import {
   useAccount,
+  usePublicClient,
   useReadContract,
   useReadContracts,
   useWriteContract,
 } from "wagmi";
 import { fundarcFactoryAbi } from "@/src/abi/factory";
 import { fundarcCampaignAbi } from "@/src/abi/campaign";
+import { ArcNameLabel } from "@/src/components/ArcNameLabel";
 import { BarChart3, ExternalLink, Plus, RefreshCcw } from "lucide-react";
 
 const FACTORY = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`;
@@ -29,8 +32,13 @@ function getMilestoneAmount(result: unknown): bigint | null {
   return null;
 }
 
+function getErrorMessage(e: any, fallback: string) {
+  return e?.shortMessage ?? e?.message ?? fallback;
+}
+
 export default function HomePage() {
   const { address } = useAccount();
+  const publicClient = usePublicClient();
   const { writeContractAsync, isPending } = useWriteContract();
 
   const [showCompleted, setShowCompleted] = useState(false);
@@ -77,6 +85,7 @@ export default function HomePage() {
       { abi: fundarcCampaignAbi, address: addr, functionName: "title" as const },
       { abi: fundarcCampaignAbi, address: addr, functionName: "milestoneCount" as const },
       { abi: fundarcCampaignAbi, address: addr, functionName: "totalWithdrawn" as const },
+      { abi: fundarcCampaignAbi, address: addr, functionName: "creator" as const },
     ]);
   }, [addresses]);
 
@@ -90,7 +99,7 @@ export default function HomePage() {
 
     const reads: any[] = [];
     for (let i = 0; i < addresses.length; i++) {
-      const msCountIndex = i * 3 + 1;
+      const msCountIndex = i * 4 + 1;
       const msCount =
         metas.data[msCountIndex]?.status === "success"
           ? Number(metas.data[msCountIndex].result ?? 0n)
@@ -120,7 +129,7 @@ export default function HomePage() {
 
     let cursor = 0;
     for (let i = 0; i < addresses.length; i++) {
-      const msCountIndex = i * 3 + 1;
+      const msCountIndex = i * 4 + 1;
       const msCount =
         metas.data[msCountIndex]?.status === "success"
           ? Number(metas.data[msCountIndex].result ?? 0n)
@@ -142,21 +151,22 @@ export default function HomePage() {
 
   async function create() {
     if (!address) {
-      alert("Connect your wallet first.");
+      toast.error("Connect your wallet first.");
       return;
     }
 
     const cleaned = milestones.map((s) => s.trim()).filter(Boolean);
     if (cleaned.length === 0) {
-      alert("Add at least one milestone.");
+      toast.error("Add at least one milestone.");
       return;
     }
 
-    const ms = cleaned.map((s) => parseUnits(s, 6));
     const votingPeriodSeconds = votingPeriodHours * 60 * 60;
+    const toastId = toast.loading("Creating campaign...");
 
     try {
-      await writeContractAsync({
+      const ms = cleaned.map((s) => parseUnits(s, 6));
+      const hash = await writeContractAsync({
         abi: fundarcFactoryAbi,
         address: FACTORY,
         functionName: "createCampaign",
@@ -169,13 +179,16 @@ export default function HomePage() {
           passBps,
         ],
       });
+      await publicClient?.waitForTransactionReceipt({ hash });
 
       campaignAddrs.refetch?.();
       metas.refetch?.();
       milestonesAll.refetch?.();
+      count.refetch?.();
+      toast.success("Campaign created successfully.", { id: toastId });
     } catch (e: any) {
       console.error(e);
-      alert(e?.shortMessage ?? e?.message ?? "Failed to create campaign.");
+      toast.error(getErrorMessage(e, "Failed to create campaign."), { id: toastId });
     }
   }
 
@@ -253,7 +266,7 @@ export default function HomePage() {
                     style={{ flex: 1, minWidth: 180 }}
                   />
                   <button
-                    className="btn btn-sm"
+                    className="btn btn-primary btn-sm"
                     onClick={() => setMilestones(milestones.filter((_, i) => i !== idx))}
                     disabled={milestones.length <= 1}
                     type="button"
@@ -262,7 +275,7 @@ export default function HomePage() {
                   </button>
                 </div>
               ))}
-              <button className="btn" onClick={() => setMilestones([...milestones, "50"])} type="button">
+              <button className="btn btn-primary" onClick={() => setMilestones([...milestones, "50"])} type="button">
                 <Plus size={16} />
                 Add milestone
               </button>
@@ -324,8 +337,9 @@ export default function HomePage() {
               const addr = r.status === "success" ? (r.result as `0x${string}`) : "";
               if (!addr) return <div key={idx} className="subtext">Loading…</div>;
 
-              const titleIndex = idx * 3;
-              const withdrawIndex = idx * 3 + 2;
+              const titleIndex = idx * 4;
+              const withdrawIndex = idx * 4 + 2;
+              const creatorIndex = idx * 4 + 3;
 
               const name =
                 metas.data?.[titleIndex]?.status === "success"
@@ -338,6 +352,10 @@ export default function HomePage() {
                 metas.data?.[withdrawIndex]?.status === "success"
                   ? (metas.data?.[withdrawIndex]?.result as bigint)
                   : 0n;
+              const creator =
+                metas.data?.[creatorIndex]?.status === "success"
+                  ? (metas.data?.[creatorIndex]?.result as `0x${string}`)
+                  : undefined;
 
               const isCompleted = requested > 0n && totalWithdrawn >= requested;
 
@@ -353,6 +371,11 @@ export default function HomePage() {
                     <div className="v mono address-line">
                       {addr}
                     </div>
+                    {creator ? (
+                      <div className="subtext" style={{ marginTop: 4 }}>
+                        Creator: <ArcNameLabel address={creator} className="mono" />
+                      </div>
+                    ) : null}
                     <div className="subtext" style={{ marginTop: 4 }}>
                       Requested: {formatUnits(requested, 6)} USDC • Withdrawn:{" "}
                       {formatUnits(totalWithdrawn, 6)} USDC

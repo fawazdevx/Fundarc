@@ -19,7 +19,7 @@ A milestone-based crowdfunding protocol where funds unlock only after contributo
 Live on Arc Testnet.
 
 👉 App: https://fundarc.netlify.app  
-👉 Demo (2–3 min): 
+👉 Demo (2–3 min): https://x.com/0xFawazdev/status/2051664921880916010
 
 Test it in minutes:
 1. Connect wallet

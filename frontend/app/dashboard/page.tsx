@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPublicClient, http, formatUnits, parseAbiItem } from "viem";
+import { useReadContracts } from "wagmi";
 import { fundarcFactoryAbi } from "@/src/abi/factory";
 import type { AbiEvent } from "viem";
 import {
@@ -23,7 +24,6 @@ const FACTORY = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`;
 const RPC_URL = process.env.NEXT_PUBLIC_ARC_RPC_URL as string; // <-- add this to .env
 const USDC_DECIMALS = 6;
 const LOG_BLOCK_RANGE = 9_999n;
-const CAMPAIGN_ADDRESS_BATCH_SIZE = 75;
 
 const client = createPublicClient({
   transport: http(RPC_URL),
@@ -31,6 +31,7 @@ const client = createPublicClient({
 
 type RangeKey = "7d" | "30d";
 type DashboardPoint = { day: string; campaigns: number; revenueUSDC: number };
+const blockTimestampCache = new Map<bigint, number>();
 
 function startOfDayUTC(tsSec: number) {
   const d = new Date(tsSec * 1000);
@@ -84,58 +85,6 @@ async function getLogsInChunks(event: AbiEvent, fromBlock: bigint, toBlock: bigi
   return logs;
 }
 
-async function getLogsForAddressesInChunks(
-  event: AbiEvent,
-  addresses: `0x${string}`[],
-  fromBlock: bigint,
-  toBlock: bigint,
-  args?: Record<string, unknown>
-) {
-  const logs = [];
-
-  for (let i = 0; i < addresses.length; i += CAMPAIGN_ADDRESS_BATCH_SIZE) {
-    const addressBatch = addresses.slice(i, i + CAMPAIGN_ADDRESS_BATCH_SIZE);
-    let chunkStart = fromBlock;
-
-    while (chunkStart <= toBlock) {
-      const chunkEnd = chunkStart + LOG_BLOCK_RANGE > toBlock ? toBlock : chunkStart + LOG_BLOCK_RANGE;
-      const chunkLogs = await client.getLogs({
-        address: addressBatch,
-        event,
-        args,
-        fromBlock: chunkStart,
-        toBlock: chunkEnd,
-      });
-
-      logs.push(...chunkLogs);
-      chunkStart = chunkEnd + 1n;
-    }
-  }
-
-  return logs;
-}
-
-async function fetchCampaignAddresses() {
-  const count = await client.readContract({
-    abi: fundarcFactoryAbi,
-    address: FACTORY,
-    functionName: "campaignsCount",
-  });
-
-  if (count === 0n) return [];
-
-  return Promise.all(
-    Array.from({ length: Number(count) }, (_, i) =>
-      client.readContract({
-        abi: fundarcFactoryAbi,
-        address: FACTORY,
-        functionName: "campaigns",
-        args: [BigInt(i)],
-      })
-    )
-  );
-}
-
 async function fetchDashboard(range: RangeKey) {
   const nowSec = Math.floor(Date.now() / 1000);
   const days = range === "7d" ? 7 : 30;
@@ -150,32 +99,14 @@ async function fetchDashboard(range: RangeKey) {
   const feeTakenEvent = parseAbiItem(
     "event FeeTaken(address indexed campaign, uint256 feeAmount)"
   ) as AbiEvent;
-  const feePaidEvent = parseAbiItem(
-    "event FeePaid(address indexed factory, uint256 feeAmount)"
-  ) as AbiEvent;
 
   const latestBlock = await client.getBlockNumber();
   const fromBlock = await findFirstBlockAtOrAfter(startDay, latestBlock);
 
-  const [createdLogs, feeTakenLogs, campaignAddresses] = await Promise.all([
+  const [createdLogs, feeLogs] = await Promise.all([
     getLogsInChunks(campaignCreatedEvent, fromBlock, latestBlock),
     getLogsInChunks(feeTakenEvent, fromBlock, latestBlock),
-    fetchCampaignAddresses(),
   ]);
-
-  const feePaidLogs = await getLogsForAddressesInChunks(
-    feePaidEvent,
-    campaignAddresses,
-    fromBlock,
-    latestBlock,
-    { factory: FACTORY }
-  );
-
-  const feeTakenTxs = new Set(feeTakenLogs.map((l) => l.transactionHash));
-  const feeLogs = [
-    ...feeTakenLogs,
-    ...feePaidLogs.filter((l) => !feeTakenTxs.has(l.transactionHash)),
-  ];
 
   // Filter by timestamp (need block timestamps)
   // We'll fetch block timestamps for only relevant logs.
@@ -184,11 +115,17 @@ async function fetchDashboard(range: RangeKey) {
   for (const l of feeLogs) uniqueBlocks.add(l.blockNumber!);
 
   const blockTs = new Map<bigint, number>();
-  // In small volumes this is fine. If it grows, we can optimize further.
   await Promise.all(
     Array.from(uniqueBlocks).map(async (bn) => {
+      const cached = blockTimestampCache.get(bn);
+      if (cached !== undefined) {
+        blockTs.set(bn, cached);
+        return;
+      }
       const b = await client.getBlock({ blockNumber: bn });
-      blockTs.set(bn, Number(b.timestamp));
+      const timestamp = Number(b.timestamp);
+      blockTimestampCache.set(bn, timestamp);
+      blockTs.set(bn, timestamp);
     })
   );
 
@@ -237,6 +174,17 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardPoint[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const summaryReads = useReadContracts({
+    contracts: [
+      { abi: fundarcFactoryAbi, address: FACTORY, functionName: "campaignsCount" },
+      { abi: fundarcFactoryAbi, address: FACTORY, functionName: "totalFeesCollected" },
+    ],
+  });
+
+  const lifetimeCampaigns =
+    summaryReads.data?.[0]?.status === "success" ? (summaryReads.data[0].result as bigint) : 0n;
+  const lifetimeRevenue =
+    summaryReads.data?.[1]?.status === "success" ? (summaryReads.data[1].result as bigint) : 0n;
 
   const totals = useMemo(() => {
     return data.reduce(
@@ -297,8 +245,10 @@ export default function DashboardPage() {
         <div className="divider" />
 
         <div className="row">
-          <span className="badge">Total campaigns: {totals.campaigns}</span>
-          <span className="badge">Total revenue: {totals.revenue.toFixed(2)} USDC</span>
+          <span className="badge">Campaigns created: {lifetimeCampaigns.toString()}</span>
+          <span className="badge">Revenue generated: {formatUnits(lifetimeRevenue, USDC_DECIMALS)} USDC</span>
+          <span className="badge">{range} campaigns: {totals.campaigns}</span>
+          <span className="badge">{range} revenue: {totals.revenue.toFixed(2)} USDC</span>
         </div>
 
         {err ? <div className="subtext" style={{ marginTop: 10, color: "rgba(255,120,140,0.9)" }}>{err}</div> : null}
