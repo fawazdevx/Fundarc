@@ -193,12 +193,24 @@ export default function HomePage() {
       toast.error("Add at least one milestone.");
       return;
     }
+    if (votingPeriodHours <= 0) {
+      toast.error("Voting period must be greater than zero.");
+      return;
+    }
+    if (quorumBps < 0 || quorumBps > 10_000 || passBps < 0 || passBps > 10_000) {
+      toast.error("Quorum and pass values must be between 0 and 10000 bps.");
+      return;
+    }
 
     const votingPeriodSeconds = votingPeriodHours * 60 * 60;
     const toastId = toast.loading("Creating campaign...");
 
     try {
       const ms = cleaned.map((s) => parseUnits(s, 6));
+      if (ms.some((amt) => amt <= 0n)) {
+        toast.error("Each milestone amount must be greater than zero.", { id: toastId });
+        return;
+      }
       const creationFee = (campaignCreationFee.data ?? 0n) as bigint;
       const currentAllowance = (factoryAllowance.data ?? 0n) as bigint;
 

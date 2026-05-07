@@ -79,7 +79,10 @@ export function Header() {
     ],
   });
 
-  const feeBps = reads.data?.[0]?.status === "success" ? (reads.data?.[0].result as number) : 0;
+  const feeBps =
+    reads.data?.[0]?.status === "success"
+      ? Number(reads.data?.[0].result ?? 0n)
+      : 0;
   const treasury = (reads.data?.[1]?.status === "success" ? (reads.data?.[1].result as string) : undefined) as
     | string
     | undefined;

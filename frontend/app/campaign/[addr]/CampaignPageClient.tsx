@@ -176,6 +176,10 @@ function getErrorMessage(e: any, fallback: string) {
   return e?.shortMessage ?? e?.message ?? fallback;
 }
 
+function isBytes32Hex(value: string) {
+  return /^0x[0-9a-fA-F]{64}$/.test(value);
+}
+
 export default function CampaignPageClient({ addr }: { addr: string }) {
   const campaign = addr as `0x${string}`;
 
@@ -396,10 +400,21 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
       return;
     }
 
+    let amt: bigint;
+    try {
+      amt = parseUnits(contribution || "0", 6);
+    } catch {
+      toast.error("Enter a valid USDC amount.");
+      return;
+    }
+    if (amt <= 0n) {
+      toast.error("Contribution amount must be greater than zero.");
+      return;
+    }
+
     const toastId = toast.loading("Preparing contribution...");
 
     try {
-      const amt = parseUnits(contribution || "0", 6);
       const currentAllowance = (allowance.data ?? 0n) as bigint;
 
       if (currentAllowance < amt) {
@@ -431,13 +446,19 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
   }
 
   async function submitMilestone() {
+    const hashValue = evidenceHash.trim();
+    if (!isBytes32Hex(hashValue)) {
+      toast.error("Evidence hash must be a valid 32-byte hex value (0x...).");
+      return;
+    }
+
     const toastId = toast.loading("Submitting milestone...");
     try {
       const hash = await writeContractAsync({
         abi: fundarcCampaignAbi,
         address: campaign,
         functionName: "submitMilestone",
-        args: [evidenceHash as `0x${string}`],
+        args: [hashValue as `0x${string}`],
       });
       await waitForReceipt(hash);
       refetchAll();
@@ -485,9 +506,24 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
   }
 
   async function withdraw() {
+    let amt: bigint;
+    try {
+      amt = parseUnits(withdrawAmt || "0", 6);
+    } catch {
+      toast.error("Enter a valid USDC amount.");
+      return;
+    }
+    if (amt <= 0n) {
+      toast.error("Withdrawal amount must be greater than zero.");
+      return;
+    }
+    if (amt > availableToWithdraw) {
+      toast.error("Withdrawal amount exceeds available balance.");
+      return;
+    }
+
     const toastId = toast.loading("Withdrawing unlocked funds...");
     try {
-      const amt = parseUnits(withdrawAmt || "0", 6);
       const hash = await writeContractAsync({
         abi: fundarcCampaignAbi,
         address: campaign,
@@ -643,7 +679,7 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
           <button
             className="btn btn-primary btn-lg btn-block"
             onClick={claimRefund}
-            disabled={isPending}
+            disabled={isPending || !address || ((myRefundable.data ?? 0n) as bigint) <= 0n}
             style={{ marginTop: 12 }}
             type="button"
           >
@@ -843,7 +879,7 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
                           <button
                             className="btn btn-primary btn-lg"
                             onClick={submitMilestone}
-                            disabled={isPending || !canSubmitMilestone}
+                            disabled={isPending || !canSubmitMilestone || !isBytes32Hex(evidenceHash.trim())}
                           >
                             <Send size={18} />
                             Submit milestone
@@ -870,7 +906,11 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
             <input value={withdrawAmt} onChange={(e) => setWithdrawAmt(e.target.value)} />
           </div>
           <div>
-            <button className="btn btn-primary btn-lg" onClick={withdraw} disabled={isPending}>
+            <button
+              className="btn btn-primary btn-lg"
+              onClick={withdraw}
+              disabled={isPending || !isCreator || availableToWithdraw <= 0n}
+            >
               <Wallet size={18} />
               Withdraw
             </button>
