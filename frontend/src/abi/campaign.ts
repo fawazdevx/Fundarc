@@ -13,8 +13,10 @@ export const fundarcCampaignAbi = [
   { type: "function", name: "title", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
   { type: "function", name: "description", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
   { type: "function", name: "creator", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+  { type: "function", name: "campaignState", stateMutability: "view", inputs: [], outputs: [{ type: "uint8" }] },
 
   { type: "function", name: "totalRaised", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "totalRefunded", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "totalWithdrawn", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "unlockedAmount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "availableToWithdraw", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },

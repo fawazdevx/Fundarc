@@ -16,6 +16,8 @@ import {
 import { fundarcFactoryAbi } from "@/src/abi/factory";
 import { fundarcCampaignAbi } from "@/src/abi/campaign";
 import { ArcNameLabel } from "@/src/components/ArcNameLabel";
+import { CreatorReputationInline } from "@/src/components/CreatorReputationCard";
+import { useCreatorReputation } from "@/src/hooks/useCreatorReputation";
 import { BarChart3, ExternalLink, Plus, RefreshCcw } from "lucide-react";
 
 const FACTORY = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`;
@@ -40,6 +42,7 @@ export default function HomePage() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync, isPending } = useWriteContract();
+  const reputation = useCreatorReputation();
 
   const [showCompleted, setShowCompleted] = useState(false);
 
@@ -356,6 +359,9 @@ export default function HomePage() {
                 metas.data?.[creatorIndex]?.status === "success"
                   ? (metas.data?.[creatorIndex]?.result as `0x${string}`)
                   : undefined;
+              const creatorReputation = creator
+                ? reputation.creators.find((item) => item.creator.toLowerCase() === creator.toLowerCase())
+                : undefined;
 
               const isCompleted = requested > 0n && totalWithdrawn >= requested;
 
@@ -374,6 +380,11 @@ export default function HomePage() {
                     {creator ? (
                       <div className="subtext" style={{ marginTop: 4 }}>
                         Creator: <ArcNameLabel address={creator} className="mono" />
+                      </div>
+                    ) : null}
+                    {creatorReputation ? (
+                      <div style={{ marginTop: 6 }}>
+                        <CreatorReputationInline reputation={creatorReputation} />
                       </div>
                     ) : null}
                     <div className="subtext" style={{ marginTop: 4 }}>

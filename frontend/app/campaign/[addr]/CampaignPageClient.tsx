@@ -17,6 +17,8 @@ import {
 import { fundarcCampaignAbi } from "@/src/abi/campaign";
 import { erc20Abi } from "@/src/abi/erc20";
 import { ArcNameLabel } from "@/src/components/ArcNameLabel";
+import { CreatorReputationCard } from "@/src/components/CreatorReputationCard";
+import { useCreatorReputation } from "@/src/hooks/useCreatorReputation";
 import {
   ExternalLink,
   RefreshCcw,
@@ -213,6 +215,7 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
     baseReads.data?.[2]?.status === "success"
       ? (baseReads.data?.[2].result as string)
       : undefined;
+  const creatorReputation = useCreatorReputation(creator);
 
   const totalRaised =
     (baseReads.data?.[3]?.status === "success"
@@ -559,6 +562,16 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
           </div>
         </div>
       </section>
+
+      {creator ? (
+        <section className="card section section-gap">
+          <CreatorReputationCard
+            reputation={creatorReputation.creator}
+            creator={creator}
+            compact
+          />
+        </section>
+      ) : null}
 
       <div className="grid-2 section-gap">
         <section className="card section">

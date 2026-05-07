@@ -279,6 +279,12 @@ select {
   color: rgba(187, 247, 208, 0.95);
 }
 
+.badge-warn {
+  border-color: rgba(245, 158, 11, 0.36);
+  background: rgba(245, 158, 11, 0.12);
+  color: rgba(254, 243, 199, 0.98);
+}
+
 .kv {
   display: flex;
   align-items: center;
@@ -318,6 +324,45 @@ select {
 .contributor-item .v {
   text-align: right;
   white-space: nowrap;
+}
+
+.reputation-card {
+  display: grid;
+  gap: 14px;
+}
+
+.reputation-score {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid rgba(45, 212, 191, 0.24);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(135deg, rgba(45, 212, 191, 0.12), rgba(245, 158, 11, 0.08)),
+    rgba(255, 255, 255, 0.04);
+}
+
+.score-value {
+  color: var(--text);
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.reputation-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reputation-metrics.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reputation-inline {
+  text-decoration: none;
 }
 
 .address-line {
@@ -584,7 +629,12 @@ a.btn-primary:hover {
   .grid-2,
   .grid-3,
   .form-grid,
+  .reputation-metrics,
   .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reputation-metrics.compact {
     grid-template-columns: 1fr;
   }
 }
@@ -632,5 +682,10 @@ a.btn-primary:hover {
   .contributor-item .v {
     text-align: left;
     white-space: normal;
+  }
+
+  .reputation-score {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
