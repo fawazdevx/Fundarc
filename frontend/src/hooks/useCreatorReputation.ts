@@ -8,8 +8,10 @@ import { fundarcFactoryAbi } from "@/src/abi/factory";
 
 const FACTORY = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`;
 
-const META_READS_PER_CAMPAIGN = 8;
+const META_READS_PER_CAMPAIGN = 12;
 const MIN_REPUTATION_CAMPAIGN_GOAL = 100n * 1_000_000n;
+const MIN_EXTERNAL_CONTRIBUTORS_FOR_REPUTATION = 3;
+const MAX_SCORE_PER_CAMPAIGN = 35;
 
 export type ReputationCampaign = {
   address: `0x${string}`;
@@ -20,6 +22,10 @@ export type ReputationCampaign = {
   totalRefunded: bigint;
   totalWithdrawn: bigint;
   unlockedAmount: bigint;
+  selfFundedAmount: bigint;
+  externalRaised: bigint;
+  uniqueContributors: number;
+  externalContributors: number;
   milestoneCount: number;
   approvedMilestones: number;
   rejectedMilestones: number;
@@ -44,6 +50,8 @@ export type CreatorReputation = {
   totalRaised: bigint;
   totalUnlocked: bigint;
   totalRefunded: bigint;
+  totalSelfFunded: bigint;
+  externalContributors: number;
   campaigns: ReputationCampaign[];
 };
 
@@ -95,20 +103,24 @@ function reputationLabel(score: number, stats: Pick<CreatorReputation, "campaign
 function scoreReputation(stats: Omit<CreatorReputation, "score" | "label" | "creator" | "campaigns" | "milestoneApprovalRate">) {
   const unlockedUSDC = Number(formatUnits(stats.totalUnlocked, 6));
   const raisedUSDC = Number(formatUnits(stats.totalRaised, 6));
+  const selfFundedUSDC = Number(formatUnits(stats.totalSelfFunded, 6));
 
-  return Math.max(
+  const rawScore = Math.max(
     0,
     Math.round(
       stats.campaignsCreated * 2 +
         stats.completedCampaigns * 20 +
         stats.approvedMilestones * 10 +
+        stats.externalContributors * 3 +
         Math.min(unlockedUSDC / 25, 30) +
         Math.min(raisedUSDC / 100, 15) -
+        Math.min(selfFundedUSDC / 10, 20) -
         stats.failedCampaigns * 25 -
         stats.canceledCampaigns * 15 -
         stats.rejectedMilestones * 15
     )
   );
+  return Math.min(rawScore, stats.campaignsCreated * MAX_SCORE_PER_CAMPAIGN);
 }
 
 export function useCreatorReputation(targetCreator?: string) {
@@ -154,6 +166,10 @@ export function useCreatorReputation(targetCreator?: string) {
         { abi: fundarcCampaignAbi, address, functionName: "totalRefunded" as const },
         { abi: fundarcCampaignAbi, address, functionName: "totalWithdrawn" as const },
         { abi: fundarcCampaignAbi, address, functionName: "unlockedAmount" as const },
+        { abi: fundarcCampaignAbi, address, functionName: "selfFundedAmount" as const },
+        { abi: fundarcCampaignAbi, address, functionName: "externalRaised" as const },
+        { abi: fundarcCampaignAbi, address, functionName: "uniqueContributors" as const },
+        { abi: fundarcCampaignAbi, address, functionName: "externalContributors" as const },
         { abi: fundarcCampaignAbi, address, functionName: "milestoneCount" as const },
       ]),
     [addresses]
@@ -168,7 +184,7 @@ export function useCreatorReputation(targetCreator?: string) {
     if (!metas.data) return [];
 
     return addresses.flatMap((address, campaignIndex) => {
-      const milestoneCountIndex = campaignIndex * META_READS_PER_CAMPAIGN + 7;
+      const milestoneCountIndex = campaignIndex * META_READS_PER_CAMPAIGN + 11;
       const milestoneCount =
         metas.data?.[milestoneCountIndex]?.status === "success"
           ? Number(metas.data[milestoneCountIndex].result ?? 0n)
@@ -203,7 +219,7 @@ export function useCreatorReputation(targetCreator?: string) {
       }
 
       const milestoneCount = numberResult(
-        metas.data[offset + 7]?.status === "success" ? metas.data[offset + 7].result : 0n
+        metas.data[offset + 11]?.status === "success" ? metas.data[offset + 11].result : 0n
       );
       let approvedMilestones = 0;
       let rejectedMilestones = 0;
@@ -222,6 +238,29 @@ export function useCreatorReputation(targetCreator?: string) {
         if (milestone.state === 3) rejectedMilestones += 1;
       }
 
+      const totalRaised = bigintResult(
+        metas.data[offset + 3]?.status === "success" ? metas.data[offset + 3].result : 0n
+      );
+      const selfFundedAmount = bigintResult(
+        metas.data[offset + 7]?.status === "success" ? metas.data[offset + 7].result : 0n
+      );
+      const rawExternalRaised = bigintResult(
+        metas.data[offset + 8]?.status === "success" ? metas.data[offset + 8].result : 0n
+      );
+      const externalRaised = metas.data[offset + 8]?.status === "success" ? rawExternalRaised : totalRaised;
+      const uniqueContributors = numberResult(
+        metas.data[offset + 9]?.status === "success" ? metas.data[offset + 9].result : 0
+      );
+      const externalContributors = numberResult(
+        metas.data[offset + 10]?.status === "success" ? metas.data[offset + 10].result : 0
+      );
+      const hasContributorBreakdown =
+        metas.data[offset + 7]?.status === "success" ||
+        metas.data[offset + 8]?.status === "success" ||
+        metas.data[offset + 10]?.status === "success";
+      const hasEnoughExternalContributors =
+        !hasContributorBreakdown || externalContributors >= MIN_EXTERNAL_CONTRIBUTORS_FOR_REPUTATION;
+
       result.push({
         address: addresses[i],
         title:
@@ -232,9 +271,7 @@ export function useCreatorReputation(targetCreator?: string) {
         campaignState: numberResult(
           metas.data[offset + 2]?.status === "success" ? metas.data[offset + 2].result : 0
         ),
-        totalRaised: bigintResult(
-          metas.data[offset + 3]?.status === "success" ? metas.data[offset + 3].result : 0n
-        ),
+        totalRaised,
         totalRefunded: bigintResult(
           metas.data[offset + 4]?.status === "success" ? metas.data[offset + 4].result : 0n
         ),
@@ -244,12 +281,16 @@ export function useCreatorReputation(targetCreator?: string) {
         unlockedAmount: bigintResult(
           metas.data[offset + 6]?.status === "success" ? metas.data[offset + 6].result : 0n
         ),
+        selfFundedAmount,
+        externalRaised,
+        uniqueContributors,
+        externalContributors,
         milestoneCount,
         approvedMilestones,
         rejectedMilestones,
         submittedMilestones,
         requestedAmount,
-        qualifiesForReputation: requestedAmount >= MIN_REPUTATION_CAMPAIGN_GOAL,
+        qualifiesForReputation: requestedAmount >= MIN_REPUTATION_CAMPAIGN_GOAL && hasEnoughExternalContributors,
       });
     }
 
@@ -278,9 +319,11 @@ export function useCreatorReputation(targetCreator?: string) {
             approvedMilestones: acc.approvedMilestones + (qualifies ? campaign.approvedMilestones : 0),
             rejectedMilestones: acc.rejectedMilestones + campaign.rejectedMilestones,
             submittedMilestones: acc.submittedMilestones + (qualifies ? campaign.submittedMilestones : 0),
-            totalRaised: acc.totalRaised + (qualifies ? campaign.totalRaised : 0n),
+            totalRaised: acc.totalRaised + (qualifies ? campaign.externalRaised : 0n),
             totalUnlocked: acc.totalUnlocked + (qualifies ? campaign.unlockedAmount : 0n),
             totalRefunded: acc.totalRefunded + campaign.totalRefunded,
+            totalSelfFunded: acc.totalSelfFunded + campaign.selfFundedAmount,
+            externalContributors: acc.externalContributors + (qualifies ? campaign.externalContributors : 0),
           };
         },
         {
@@ -295,6 +338,8 @@ export function useCreatorReputation(targetCreator?: string) {
           totalRaised: 0n,
           totalUnlocked: 0n,
           totalRefunded: 0n,
+          totalSelfFunded: 0n,
+          externalContributors: 0,
         }
       );
       const milestoneApprovalRate =

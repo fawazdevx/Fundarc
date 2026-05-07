@@ -76,6 +76,12 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
     uint40 public votingPeriod;
     uint16 public quorumBps;
     uint16 public passBps;
+    uint40 public createdAt;
+    uint40 public fundingDeadline;
+    uint256 public selfFundedAmount;
+    uint256 public externalRaised;
+    uint256 public uniqueContributors;
+    uint256 public externalContributors;
 
     modifier onlyCreator() {
         require(msg.sender == creator, "NOT_CREATOR");
@@ -96,7 +102,8 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
         uint96[] calldata milestoneAmounts,
         uint40 _votingPeriod,
         uint16 _quorumBps,
-        uint16 _passBps
+        uint16 _passBps,
+        uint40 _fundingPeriod
     ) external initializer {
         require(_creator != address(0), "BAD_CREATOR");
         require(_usdc != address(0), "BAD_USDC");
@@ -118,6 +125,8 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
         votingPeriod = _votingPeriod;
         quorumBps = _quorumBps;
         passBps = _passBps;
+        createdAt = uint40(block.timestamp);
+        fundingDeadline = _fundingPeriod == 0 ? 0 : uint40(block.timestamp) + _fundingPeriod;
 
         campaignState = CampaignState.Active;
 
@@ -165,10 +174,25 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
 
     function contribute(uint256 amount) external nonReentrant inState(CampaignState.Active) {
         require(amount > 0, "AMOUNT=0");
+        require(fundingDeadline == 0 || block.timestamp <= fundingDeadline, "FUNDING_CLOSED");
         require(usdc.transferFrom(msg.sender, address(this), amount), "TRANSFER_FROM_FAIL");
 
+        bool firstContribution = contributed[msg.sender] == 0;
         contributed[msg.sender] += amount;
         totalRaised += amount;
+
+        if (firstContribution) {
+            uniqueContributors += 1;
+        }
+
+        if (msg.sender == creator) {
+            selfFundedAmount += amount;
+        } else {
+            externalRaised += amount;
+            if (firstContribution) {
+                externalContributors += 1;
+            }
+        }
 
         emit Contributed(msg.sender, amount);
     }
@@ -202,7 +226,7 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
         require(block.timestamp >= m.voteStart && block.timestamp < m.voteEnd, "VOTE_CLOSED");
         require(voteChoice[milestoneIndex][msg.sender] == 0, "ALREADY_VOTED");
 
-        uint256 weight = contributed[msg.sender];
+        uint256 weight = msg.sender == creator ? 0 : contributed[msg.sender];
         require(weight > 0, "NO_WEIGHT");
 
         voteChoice[milestoneIndex][msg.sender] = support ? 1 : 2;
@@ -222,7 +246,7 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
 
         uint256 participated = uint256(m.yesWeight) + uint256(m.noWeight);
 
-        bool quorumMet = (totalRaised > 0) && (participated * 10_000 >= totalRaised * quorumBps);
+        bool quorumMet = (externalRaised > 0) && (participated * 10_000 >= externalRaised * quorumBps);
 
         bool approved = false;
         if (participated > 0) {

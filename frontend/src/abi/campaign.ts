@@ -20,6 +20,12 @@ export const fundarcCampaignAbi = [
   { type: "function", name: "totalWithdrawn", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "unlockedAmount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "availableToWithdraw", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "selfFundedAmount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "externalRaised", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "uniqueContributors", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "externalContributors", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "createdAt", stateMutability: "view", inputs: [], outputs: [{ type: "uint40" }] },
+  { type: "function", name: "fundingDeadline", stateMutability: "view", inputs: [], outputs: [{ type: "uint40" }] },
 
   { type: "function", name: "milestoneCount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   {

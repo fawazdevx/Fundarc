@@ -15,6 +15,7 @@ import {
 } from "wagmi";
 import { fundarcFactoryAbi } from "@/src/abi/factory";
 import { fundarcCampaignAbi } from "@/src/abi/campaign";
+import { erc20Abi } from "@/src/abi/erc20";
 import { ArcNameLabel } from "@/src/components/ArcNameLabel";
 import { CreatorReputationInline } from "@/src/components/CreatorReputationCard";
 import { useCreatorReputation } from "@/src/hooks/useCreatorReputation";
@@ -22,8 +23,11 @@ import { BarChart3, ExternalLink, Plus, RefreshCcw } from "lucide-react";
 
 const FACTORY = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`;
 const EXPLORER = process.env.NEXT_PUBLIC_EXPLORER!;
-const CAMPAIGN_CREATION_MAINTENANCE = true;
+const USDC = process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`;
+const CAMPAIGN_CREATION_MAINTENANCE =
+  process.env.NEXT_PUBLIC_CAMPAIGN_CREATION_MAINTENANCE === "true";
 const MIN_RECOMMENDED_CAMPAIGN_USDC = 100;
+const MIN_VISIBLE_CAMPAIGN_USDC = 100n * 1_000_000n;
 
 function explorerAddress(addr: string) {
   return `${EXPLORER}/address/${addr}`;
@@ -62,8 +66,27 @@ export default function HomePage() {
     address: FACTORY,
     functionName: "campaignsCount",
   });
+  const campaignCreationPaused = useReadContract({
+    abi: fundarcFactoryAbi,
+    address: FACTORY,
+    functionName: "campaignCreationPaused",
+  });
+  const campaignCreationFee = useReadContract({
+    abi: fundarcFactoryAbi,
+    address: FACTORY,
+    functionName: "campaignCreationFee",
+  });
+  const factoryAllowance = useReadContract({
+    abi: erc20Abi,
+    address: USDC,
+    functionName: "allowance",
+    args: [address ?? "0x0000000000000000000000000000000000000000", FACTORY],
+    query: { enabled: !!address },
+  });
 
   const n = Number(count.data ?? 0n);
+  const isCreationPaused =
+    CAMPAIGN_CREATION_MAINTENANCE || campaignCreationPaused.data === true;
 
   const campaignAddrReads = useMemo(() => {
     return Array.from({ length: n }, (_, i) => ({
@@ -155,7 +178,7 @@ export default function HomePage() {
   }, [addresses, metas.data, milestonesAll.data]);
 
   async function create() {
-    if (CAMPAIGN_CREATION_MAINTENANCE) {
+    if (CAMPAIGN_CREATION_MAINTENANCE || campaignCreationPaused.data === true) {
       toast.error("Campaign creation is temporarily paused for maintenance.");
       return;
     }
@@ -176,6 +199,21 @@ export default function HomePage() {
 
     try {
       const ms = cleaned.map((s) => parseUnits(s, 6));
+      const creationFee = (campaignCreationFee.data ?? 0n) as bigint;
+      const currentAllowance = (factoryAllowance.data ?? 0n) as bigint;
+
+      if (creationFee > 0n && currentAllowance < creationFee) {
+        toast.loading("Approving campaign creation fee...", { id: toastId });
+        const approvalHash = await writeContractAsync({
+          abi: erc20Abi,
+          address: USDC,
+          functionName: "approve",
+          args: [FACTORY, creationFee],
+        });
+        await publicClient?.waitForTransactionReceipt({ hash: approvalHash });
+      }
+
+      toast.loading("Creating campaign...", { id: toastId });
       const hash = await writeContractAsync({
         abi: fundarcFactoryAbi,
         address: FACTORY,
@@ -244,14 +282,14 @@ export default function HomePage() {
       <div className="grid-2 section-gap">
         {/* CREATE */}
         <section className="card section">
-          {CAMPAIGN_CREATION_MAINTENANCE ? (
+          {isCreationPaused ? (
             <div className="maintenance-panel">
               <span className="badge badge-warn">Maintenance mode</span>
               <div className="section-copy">
                 <h2>Campaign creation is paused</h2>
                 <div className="subtext">
-                  Fundarc is temporarily blocking new campaign creation while anti-spam and creator reputation
-                  safeguards are being upgraded. Existing campaigns remain visible for review.
+                  Fundarc is temporarily blocking new campaign creation while updates are in progress. Existing
+                  campaigns remain visible for review.
                 </div>
               </div>
               <div className="kv">
@@ -396,7 +434,9 @@ export default function HomePage() {
                 : undefined;
 
               const isCompleted = requested > 0n && totalWithdrawn >= requested;
+              const isSpamCampaign = requested < MIN_VISIBLE_CAMPAIGN_USDC;
 
+              if (isSpamCampaign) return null;
               if (!showCompleted && isCompleted) return null;
 
               return (

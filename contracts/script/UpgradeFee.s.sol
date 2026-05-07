@@ -7,10 +7,15 @@ import {FundarcFactory} from "../src/FundarcFactory.sol";
 
 contract UpgradeFee is Script {
     uint256 internal constant DEFAULT_MIN_CAMPAIGN_GOAL = 100 * 1e6;
+    uint256 internal constant DEFAULT_CREATION_FEE = 0;
+    uint40 internal constant DEFAULT_FUNDING_PERIOD = 30 days;
 
     function run() external {
         address factoryProxy = vm.envAddress("FACTORY_PROXY");
         uint256 minCampaignGoal = vm.envOr("MIN_CAMPAIGN_GOAL", DEFAULT_MIN_CAMPAIGN_GOAL);
+        uint256 campaignCreationFee = vm.envOr("CAMPAIGN_CREATION_FEE", DEFAULT_CREATION_FEE);
+        uint40 defaultFundingPeriod = uint40(vm.envOr("DEFAULT_FUNDING_PERIOD", uint256(DEFAULT_FUNDING_PERIOD)));
+        bool creationPaused = vm.envOr("CAMPAIGN_CREATION_PAUSED", false);
 
         vm.startBroadcast();
 
@@ -45,16 +50,38 @@ contract UpgradeFee is Script {
             factoryProxy.call(abi.encodeWithSignature("setMinimumCampaignGoal(uint256)", minCampaignGoal));
         require(ok3, _getRevertMsg(ret3));
 
-        // 5) Post-check: confirm it updated
+        // 5) Configure anti-spam controls for new campaigns.
+        (bool ok4, bytes memory ret4) =
+            factoryProxy.call(abi.encodeWithSignature("setCampaignCreationFee(uint256)", campaignCreationFee));
+        require(ok4, _getRevertMsg(ret4));
+
+        (bool ok5, bytes memory ret5) =
+            factoryProxy.call(abi.encodeWithSignature("setDefaultFundingPeriod(uint40)", defaultFundingPeriod));
+        require(ok5, _getRevertMsg(ret5));
+
+        (bool ok6, bytes memory ret6) =
+            factoryProxy.call(abi.encodeWithSignature("setCampaignCreationPaused(bool)", creationPaused));
+        require(ok6, _getRevertMsg(ret6));
+
+        // 6) Post-check: confirm it updated
         address implNow = FundarcFactory(factoryProxy).campaignImplementation();
         require(implNow == address(newCampaignImpl), "CAMPAIGN_IMPL_NOT_UPDATED");
         uint256 minGoalNow = FundarcFactory(factoryProxy).minimumCampaignGoal();
         require(minGoalNow == minCampaignGoal, "MIN_GOAL_NOT_UPDATED");
+        uint256 creationFeeNow = FundarcFactory(factoryProxy).campaignCreationFee();
+        require(creationFeeNow == campaignCreationFee, "CREATION_FEE_NOT_UPDATED");
+        uint40 fundingPeriodNow = FundarcFactory(factoryProxy).defaultFundingPeriod();
+        require(fundingPeriodNow == defaultFundingPeriod, "FUNDING_PERIOD_NOT_UPDATED");
+        bool pausedNow = FundarcFactory(factoryProxy).campaignCreationPaused();
+        require(pausedNow == creationPaused, "CREATION_PAUSE_NOT_UPDATED");
 
         vm.stopBroadcast();
 
         console2.log("campaignImplementation now:", implNow);
         console2.log("minimumCampaignGoal now:", minGoalNow);
+        console2.log("campaignCreationFee now:", creationFeeNow);
+        console2.log("defaultFundingPeriod now:", fundingPeriodNow);
+        console2.log("campaignCreationPaused now:", pausedNow);
         console2.log("Upgrade complete.");
     }
 
