@@ -33,8 +33,14 @@ const USDC = process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`;
 const FACTORY = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`;
 const EXPLORER = process.env.NEXT_PUBLIC_EXPLORER!;
 const CONTRIBUTOR_LOOKUP_TIMEOUT_MS = 12_000;
+const RPC_CHUNK_TIMEOUT_MS = 6_000;
 const LOG_BLOCK_RANGE = 9_999n;
-const deploymentBlockCache = new Map<string, bigint>();
+const MINIMUM_CONTRIBUTION_USDC = 10;
+const MINIMUM_CONTRIBUTION = 10n * 1_000_000n;
+
+function cleanCampaignDescription(description: string) {
+  return description.replace(/\n?\[Fundarc category:[^\]]+\]\s*$/i, "").trim();
+}
 
 function addrUrl(a: string) {
   return `${EXPLORER}/address/${a}`;
@@ -64,7 +70,11 @@ async function getLogsInChunks(
     }
 
     const chunkEnd = chunkStart + LOG_BLOCK_RANGE > toBlock ? toBlock : chunkStart + LOG_BLOCK_RANGE;
-    const chunkLogs = await getLogs(chunkStart, chunkEnd);
+    const chunkLogs = await withTimeout(
+      getLogs(chunkStart, chunkEnd),
+      RPC_CHUNK_TIMEOUT_MS,
+      "RPC log request timed out. Try again in a moment."
+    );
     logs.push(...chunkLogs);
     chunkStart = chunkEnd + 1n;
   }
@@ -87,13 +97,17 @@ async function findCampaignCreatedBlock(
 
     const chunkStart =
       chunkEnd > minBlock + LOG_BLOCK_RANGE ? chunkEnd - LOG_BLOCK_RANGE : minBlock;
-    const logs = await publicClient.getLogs({
-      address: FACTORY,
-      event,
-      args: { campaign },
-      fromBlock: chunkStart,
-      toBlock: chunkEnd,
-    });
+    const logs = await withTimeout(
+      publicClient.getLogs({
+        address: FACTORY,
+        event,
+        args: { campaign },
+        fromBlock: chunkStart,
+        toBlock: chunkEnd,
+      }),
+      RPC_CHUNK_TIMEOUT_MS,
+      "Campaign creation lookup timed out. Try again in a moment."
+    );
 
     if (logs[0]?.blockNumber !== undefined) return logs[0].blockNumber;
     if (chunkStart === minBlock) break;
@@ -101,33 +115,6 @@ async function findCampaignCreatedBlock(
   }
 
   return minBlock;
-}
-
-async function findDeploymentBlock(
-  publicClient: NonNullable<ReturnType<typeof usePublicClient>>,
-  address: `0x${string}`,
-  latestBlock: bigint
-) {
-  const cacheKey = address.toLowerCase();
-  const cached = deploymentBlockCache.get(cacheKey);
-  if (cached !== undefined) return cached;
-
-  let low = 0n;
-  let high = latestBlock;
-
-  while (low < high) {
-    const mid = (low + high) / 2n;
-    const code = await publicClient.getCode({ address, blockNumber: mid });
-
-    if (code && code !== "0x") {
-      high = mid;
-    } else {
-      low = mid + 1n;
-    }
-  }
-
-  deploymentBlockCache.set(cacheKey, low);
-  return low;
 }
 
 function secondsToHuman(secs: number) {
@@ -192,6 +179,7 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
   const [withdrawAmt, setWithdrawAmt] = useState("1");
   const [contributors, setContributors] = useState<Contributor[]>([]);
   const [contributorsLoading, setContributorsLoading] = useState(false);
+  const [contributorsLoaded, setContributorsLoaded] = useState(false);
   const [contributorsError, setContributorsError] = useState<string | null>(null);
 
   const baseReads = useReadContracts({
@@ -213,7 +201,7 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
       : undefined;
   const description =
     baseReads.data?.[1]?.status === "success"
-      ? (baseReads.data?.[1].result as string)
+      ? cleanCampaignDescription(baseReads.data?.[1].result as string)
       : undefined;
   const creator =
     baseReads.data?.[2]?.status === "success"
@@ -310,7 +298,6 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
       ) as AbiEvent;
       const startedAt = Date.now();
       const latestBlock = await publicClient.getBlockNumber();
-      const campaignDeployBlock = await findDeploymentBlock(publicClient, campaign, latestBlock);
 
       const fromBlock = await withTimeout(
         findCampaignCreatedBlock(
@@ -318,7 +305,7 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
           campaign,
           campaignCreatedEvent,
           latestBlock,
-          campaignDeployBlock,
+          0n,
           startedAt
         ),
         CONTRIBUTOR_LOOKUP_TIMEOUT_MS,
@@ -357,6 +344,7 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
           contributions: data.contributions,
         })).sort((a, b) => (a.amount === b.amount ? 0 : a.amount > b.amount ? -1 : 1))
       );
+      setContributorsLoaded(true);
     } catch (e: any) {
       console.error(e);
       setContributorsError(e?.shortMessage ?? e?.message ?? "Failed to load contributors.");
@@ -375,7 +363,7 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
 
   function refetchAll() {
     refetchCoreReads();
-    void refetchContributors();
+    if (contributorsLoaded) void refetchContributors();
   }
 
   async function waitForReceipt(hash: `0x${string}`) {
@@ -390,9 +378,11 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
   }, [campaign, address, creator, milestoneCount]);
 
   useEffect(() => {
-    void refetchContributors();
+    setContributors([]);
+    setContributorsLoaded(false);
+    setContributorsError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaign, publicClient]);
+  }, [campaign]);
 
   async function approveAndContribute() {
     if (!address) {
@@ -409,6 +399,10 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
     }
     if (amt <= 0n) {
       toast.error("Contribution amount must be greater than zero.");
+      return;
+    }
+    if (amt < MINIMUM_CONTRIBUTION) {
+      toast.error(`Minimum contribution is ${MINIMUM_CONTRIBUTION_USDC} USDC.`);
       return;
     }
 
@@ -648,7 +642,7 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
         <section className="card section">
           <div className="section-copy">
             <h2>Contribute</h2>
-            <div className="subtext">Approve once, then contribute. Amount is in USDC.</div>
+            <div className="subtext">Approve once, then contribute. Minimum is {MINIMUM_CONTRIBUTION_USDC} USDC.</div>
           </div>
 
           <div className="row align-end section-gap">
@@ -693,9 +687,14 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
         <div className="section-head">
           <div className="section-copy">
             <h2>Contributors</h2>
-            <div className="subtext">Wallets that have funded this campaign, aggregated from contribution events.</div>
+            <div className="subtext">Wallets that have funded this campaign. Load on demand to avoid slow RPC scans.</div>
           </div>
-          <span className="badge">wallets: {contributors.length}</span>
+          <div className="actions">
+            <span className="badge">wallets: {contributors.length}</span>
+            <button className="btn btn-sm" type="button" onClick={refetchContributors} disabled={contributorsLoading}>
+              {contributorsLoading ? "Loading..." : contributorsLoaded ? "Refresh contributors" : "Load contributors"}
+            </button>
+          </div>
         </div>
 
         <div className="contributor-list">
@@ -703,6 +702,8 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
             <div className="subtext">Loading contributors...</div>
           ) : contributorsError ? (
             <div className="subtext">{contributorsError}</div>
+          ) : !contributorsLoaded ? (
+            <div className="subtext">Contributor history is available on demand.</div>
           ) : contributors.length === 0 ? (
             <div className="subtext">No contributor wallets found yet.</div>
           ) : (

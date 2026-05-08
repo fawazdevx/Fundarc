@@ -17,9 +17,7 @@ import { fundarcFactoryAbi } from "@/src/abi/factory";
 import { fundarcCampaignAbi } from "@/src/abi/campaign";
 import { erc20Abi } from "@/src/abi/erc20";
 import { ArcNameLabel } from "@/src/components/ArcNameLabel";
-import { CreatorReputationInline } from "@/src/components/CreatorReputationCard";
-import { useCreatorReputation } from "@/src/hooks/useCreatorReputation";
-import { BarChart3, ExternalLink, Plus, RefreshCcw } from "lucide-react";
+import { BarChart3, ExternalLink, Plus, RefreshCcw, Search, Share2, ShieldCheck } from "lucide-react";
 
 const FACTORY = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`;
 const EXPLORER = process.env.NEXT_PUBLIC_EXPLORER!;
@@ -28,6 +26,35 @@ const CAMPAIGN_CREATION_MAINTENANCE =
   process.env.NEXT_PUBLIC_CAMPAIGN_CREATION_MAINTENANCE === "true";
 const MIN_RECOMMENDED_CAMPAIGN_USDC = 100;
 const MIN_VISIBLE_CAMPAIGN_USDC = 100n * 1_000_000n;
+const CAMPAIGN_META_READS = 8;
+const INITIAL_CAMPAIGN_SCAN = 60;
+const CAMPAIGN_SCAN_STEP = 60;
+const DISCOVERY_SKIP_FACTORY_INDEXES = 200;
+const MAX_MILESTONES = 12;
+const MAX_TITLE_LENGTH = 96;
+const MAX_DESCRIPTION_LENGTH = 1_900;
+const MAX_VOTING_PERIOD_HOURS = 24 * 30;
+const CATEGORY_TAG_PREFIX = "[Fundarc category:";
+const DISCOVERY_CATEGORIES = ["All", "Public goods", "Open source", "Creator", "Community"] as const;
+const CREATE_CATEGORIES = ["Public goods", "Open source", "Creator", "Community"] as const;
+
+type DiscoveryCategory = (typeof DISCOVERY_CATEGORIES)[number];
+type CampaignCategory = (typeof CREATE_CATEGORIES)[number];
+type SortMode = "trending" | "newest" | "goal";
+
+type CampaignCard = {
+  addr: `0x${string}`;
+  title: string;
+  description: string;
+  creator?: `0x${string}`;
+  requested: bigint;
+  requestedResolved: boolean;
+  totalRaised: bigint;
+  totalWithdrawn: bigint;
+  externalContributors: number;
+  createdAt: number;
+  category?: CampaignCategory;
+};
 
 function explorerAddress(addr: string) {
   return `${EXPLORER}/address/${addr}`;
@@ -44,18 +71,58 @@ function getErrorMessage(e: any, fallback: string) {
   return e?.shortMessage ?? e?.message ?? fallback;
 }
 
+function numberResult(value: unknown) {
+  if (typeof value === "number") return value;
+  if (typeof value === "bigint") return Number(value);
+  return 0;
+}
+
+function parseCampaignDescription(rawDescription: string): { description: string; category?: CampaignCategory } {
+  const categoryLine = rawDescription
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.startsWith(CATEGORY_TAG_PREFIX) && line.endsWith("]"));
+  const category = categoryLine
+    ?.replace(CATEGORY_TAG_PREFIX, "")
+    .replace("]", "")
+    .trim() as CampaignCategory | undefined;
+  const validCategory = CREATE_CATEGORIES.includes(category as CampaignCategory) ? category : undefined;
+
+  return {
+    description: rawDescription
+      .replace(/\n?\[Fundarc category:[^\]]+\]\s*$/i, "")
+      .trim(),
+    category: validCategory,
+  };
+}
+
+function descriptionWithCategory(description: string, category: CampaignCategory) {
+  return `${description.trim()}\n\n${CATEGORY_TAG_PREFIX} ${category}]`;
+}
+
+function shareUrl(addr: string, title: string) {
+  const campaignUrl =
+    typeof window === "undefined" ? `/campaign/${addr}` : `${window.location.origin}/campaign/${addr}`;
+  const text = encodeURIComponent(`Support ${title} on Fundarc`);
+  return `https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(campaignUrl)}`;
+}
+
 export default function HomePage() {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync, isPending } = useWriteContract();
-  const reputation = useCreatorReputation();
 
   const [showCompleted, setShowCompleted] = useState(false);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<DiscoveryCategory>("All");
+  const [sortMode, setSortMode] = useState<SortMode>("trending");
+  const [scanCount, setScanCount] = useState(INITIAL_CAMPAIGN_SCAN);
 
   const [title, setTitle] = useState("Fundarc Campaign");
   const [description, setDescription] = useState(
     "Milestone-based stablecoin crowdfunding on Arc."
   );
+  const [createCategory, setCreateCategory] = useState<CampaignCategory>("Public goods");
   const [milestones, setMilestones] = useState<string[]>(["100", "200"]);
   const [votingPeriodHours, setVotingPeriodHours] = useState(24);
   const [quorumBps, setQuorumBps] = useState(2000);
@@ -87,15 +154,28 @@ export default function HomePage() {
   const n = Number(count.data ?? 0n);
   const isCreationPaused =
     CAMPAIGN_CREATION_MAINTENANCE || campaignCreationPaused.data === true;
+  const discoverableCampaignCount = Math.max(0, n - DISCOVERY_SKIP_FACTORY_INDEXES);
+  const activeScanCount = Math.min(discoverableCampaignCount, scanCount);
+  const hasMoreCampaigns = activeScanCount < discoverableCampaignCount;
+  const milestoneTotal = useMemo(() => {
+    try {
+      return milestones
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .reduce((sum, value) => sum + parseUnits(value, 6), 0n);
+    } catch {
+      return 0n;
+    }
+  }, [milestones]);
 
   const campaignAddrReads = useMemo(() => {
-    return Array.from({ length: n }, (_, i) => ({
+    return Array.from({ length: activeScanCount }, (_, i) => ({
       abi: fundarcFactoryAbi,
       address: FACTORY,
       functionName: "campaigns" as const,
-      args: [BigInt(i)] as const,
+      args: [BigInt(n - 1 - i)] as const,
     }));
-  }, [n]);
+  }, [activeScanCount, n]);
 
   const campaignAddrs = useReadContracts({
     contracts: campaignAddrReads,
@@ -111,9 +191,13 @@ export default function HomePage() {
   const metaReads = useMemo(() => {
     return addresses.flatMap((addr) => [
       { abi: fundarcCampaignAbi, address: addr, functionName: "title" as const },
+      { abi: fundarcCampaignAbi, address: addr, functionName: "description" as const },
       { abi: fundarcCampaignAbi, address: addr, functionName: "milestoneCount" as const },
       { abi: fundarcCampaignAbi, address: addr, functionName: "totalWithdrawn" as const },
       { abi: fundarcCampaignAbi, address: addr, functionName: "creator" as const },
+      { abi: fundarcCampaignAbi, address: addr, functionName: "totalRaised" as const },
+      { abi: fundarcCampaignAbi, address: addr, functionName: "externalContributors" as const },
+      { abi: fundarcCampaignAbi, address: addr, functionName: "createdAt" as const },
     ]);
   }, [addresses]);
 
@@ -127,7 +211,7 @@ export default function HomePage() {
 
     const reads: any[] = [];
     for (let i = 0; i < addresses.length; i++) {
-      const msCountIndex = i * 4 + 1;
+      const msCountIndex = i * CAMPAIGN_META_READS + 2;
       const msCount =
         metas.data[msCountIndex]?.status === "success"
           ? Number(metas.data[msCountIndex].result ?? 0n)
@@ -150,32 +234,101 @@ export default function HomePage() {
     query: { enabled: milestoneReads.length > 0 },
   });
 
-  const totalsByCampaign = useMemo(() => {
-    const totals = new Map<string, bigint>();
-    addresses.forEach((a) => totals.set(a, 0n));
-    if (!metas.data || !milestonesAll.data) return totals;
+  const campaignCards = useMemo(() => {
+    if (!metas.data) return [];
 
+    const cards: CampaignCard[] = [];
     let cursor = 0;
     for (let i = 0; i < addresses.length; i++) {
-      const msCountIndex = i * 4 + 1;
+      const offset = i * CAMPAIGN_META_READS;
+      const msCountIndex = offset + 2;
       const msCount =
         metas.data[msCountIndex]?.status === "success"
           ? Number(metas.data[msCountIndex].result ?? 0n)
           : 0;
 
       let sum = 0n;
+      let requestedResolved = !!milestonesAll.data && msCount > 0;
       for (let m = 0; m < msCount; m++) {
-        const r = milestonesAll.data[cursor++];
+        const r = milestonesAll.data?.[cursor++];
         if (r?.status === "success") {
           const amt = getMilestoneAmount(r.result);
           if (amt) sum += amt;
+        } else {
+          requestedResolved = false;
         }
       }
-      totals.set(addresses[i], sum);
+
+      const title =
+        metas.data[offset]?.status === "success" && typeof metas.data[offset].result === "string"
+          ? (metas.data[offset].result as string)
+          : "Campaign";
+      const description =
+        metas.data[offset + 1]?.status === "success" && typeof metas.data[offset + 1].result === "string"
+          ? (metas.data[offset + 1].result as string)
+          : "";
+      const parsedDescription = parseCampaignDescription(description);
+      const creator =
+        metas.data[offset + 4]?.status === "success" && typeof metas.data[offset + 4].result === "string"
+          ? (metas.data[offset + 4].result as `0x${string}`)
+          : undefined;
+
+      cards.push({
+        addr: addresses[i],
+        title,
+        description: parsedDescription.description,
+        creator,
+        requested: sum,
+        requestedResolved,
+        totalWithdrawn:
+          metas.data[offset + 3]?.status === "success" ? (metas.data[offset + 3].result as bigint) : 0n,
+        totalRaised:
+          metas.data[offset + 5]?.status === "success" ? (metas.data[offset + 5].result as bigint) : 0n,
+        externalContributors:
+          metas.data[offset + 6]?.status === "success" ? numberResult(metas.data[offset + 6].result) : 0,
+        createdAt:
+          metas.data[offset + 7]?.status === "success" ? numberResult(metas.data[offset + 7].result) : 0,
+        category: parsedDescription.category,
+      });
     }
 
-    return totals;
+    return cards;
   }, [addresses, metas.data, milestonesAll.data]);
+
+  const visibleCampaigns = useMemo(() => {
+    const q = query.trim().toLowerCase();
+
+    return campaignCards
+      .filter((campaign) => {
+        const isBelowVisibleGoal =
+          !campaign.requestedResolved || campaign.requested < MIN_VISIBLE_CAMPAIGN_USDC;
+        const isCompleted =
+          campaign.requestedResolved && campaign.requested > 0n && campaign.totalWithdrawn >= campaign.requested;
+        const matchesQuery =
+          !q ||
+          campaign.title.toLowerCase().includes(q) ||
+          campaign.description.toLowerCase().includes(q) ||
+          campaign.addr.toLowerCase().includes(q) ||
+          campaign.creator?.toLowerCase().includes(q);
+        const matchesCategory = category === "All" || campaign.category === category;
+
+        return !isBelowVisibleGoal && (showCompleted || !isCompleted) && matchesQuery && matchesCategory;
+      })
+      .sort((a, b) => {
+        if (sortMode === "newest") return b.createdAt - a.createdAt;
+        if (sortMode === "goal") return Number(b.requested - a.requested);
+        const bTrend = b.totalRaised + BigInt(b.externalContributors) * 10_000_000n;
+        const aTrend = a.totalRaised + BigInt(a.externalContributors) * 10_000_000n;
+        return Number(bTrend - aTrend);
+      });
+  }, [campaignCards, category, query, showCompleted, sortMode]);
+
+  const verifyingCampaigns = campaignCards.filter((campaign) => !campaign.requestedResolved).length;
+  const listLoading =
+    count.isLoading ||
+    campaignAddrs.isLoading ||
+    metas.isLoading ||
+    (milestoneReads.length > 0 && milestonesAll.isLoading);
 
   async function create() {
     if (CAMPAIGN_CREATION_MAINTENANCE || campaignCreationPaused.data === true) {
@@ -193,8 +346,20 @@ export default function HomePage() {
       toast.error("Add at least one milestone.");
       return;
     }
-    if (votingPeriodHours <= 0) {
-      toast.error("Voting period must be greater than zero.");
+    if (cleaned.length > MAX_MILESTONES) {
+      toast.error(`Use ${MAX_MILESTONES} milestones or fewer.`);
+      return;
+    }
+    if (!title.trim() || title.trim().length > MAX_TITLE_LENGTH) {
+      toast.error(`Title must be 1-${MAX_TITLE_LENGTH} characters.`);
+      return;
+    }
+    if (!description.trim() || description.trim().length > MAX_DESCRIPTION_LENGTH) {
+      toast.error(`Description must be 1-${MAX_DESCRIPTION_LENGTH} characters.`);
+      return;
+    }
+    if (votingPeriodHours < 1 || votingPeriodHours > MAX_VOTING_PERIOD_HOURS) {
+      toast.error(`Voting period must be between 1 hour and ${MAX_VOTING_PERIOD_HOURS} hours.`);
       return;
     }
     if (quorumBps < 0 || quorumBps > 10_000 || passBps < 0 || passBps > 10_000) {
@@ -209,6 +374,11 @@ export default function HomePage() {
       const ms = cleaned.map((s) => parseUnits(s, 6));
       if (ms.some((amt) => amt <= 0n)) {
         toast.error("Each milestone amount must be greater than zero.", { id: toastId });
+        return;
+      }
+      const requestedTotal = ms.reduce((sum, amt) => sum + amt, 0n);
+      if (requestedTotal < MIN_VISIBLE_CAMPAIGN_USDC) {
+        toast.error(`Campaign goal must be at least ${MIN_RECOMMENDED_CAMPAIGN_USDC} USDC.`, { id: toastId });
         return;
       }
       const creationFee = (campaignCreationFee.data ?? 0n) as bigint;
@@ -231,8 +401,8 @@ export default function HomePage() {
         address: FACTORY,
         functionName: "createCampaign",
         args: [
-          title,
-          description,
+          title.trim(),
+          descriptionWithCategory(description, createCategory),
           ms,
           votingPeriodSeconds,
           quorumBps,
@@ -326,12 +496,30 @@ export default function HomePage() {
 
               <div className="field">
                 <label>Title</label>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} />
+                <input maxLength={MAX_TITLE_LENGTH} value={title} onChange={(e) => setTitle(e.target.value)} />
+                <div className="fineprint">{title.length}/{MAX_TITLE_LENGTH}</div>
               </div>
 
               <div className="field section-gap">
                 <label>Description</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+                <textarea
+                  maxLength={MAX_DESCRIPTION_LENGTH}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+                <div className="fineprint">{description.length}/{MAX_DESCRIPTION_LENGTH}</div>
+              </div>
+
+              <div className="field section-gap">
+                <label>Category</label>
+                <select value={createCategory} onChange={(e) => setCreateCategory(e.target.value as CampaignCategory)}>
+                  {CREATE_CATEGORIES.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+                <div className="fineprint">This is saved with the campaign so Discovery filters can find it later.</div>
               </div>
 
               <div className="section-gap">
@@ -358,10 +546,18 @@ export default function HomePage() {
                       </button>
                     </div>
                   ))}
-                  <button className="btn btn-primary" onClick={() => setMilestones([...milestones, "50"])} type="button">
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => setMilestones([...milestones, "50"])}
+                    disabled={milestones.length >= MAX_MILESTONES}
+                    type="button"
+                  >
                     <Plus size={16} />
                     Add milestone
                   </button>
+                </div>
+                <div className={milestoneTotal < MIN_VISIBLE_CAMPAIGN_USDC ? "fineprint warn-text" : "fineprint"}>
+                  Total requested: {formatUnits(milestoneTotal, 6)} USDC. Minimum: {MIN_RECOMMENDED_CAMPAIGN_USDC} USDC. Max milestones: {MAX_MILESTONES}.
                 </div>
               </div>
 
@@ -402,13 +598,52 @@ export default function HomePage() {
         <section className="card section">
           <div className="section-head">
             <div className="section-copy">
-              <h2>Campaigns</h2>
-              <div className="subtext">Browse active campaign contracts and funding progress.</div>
+              <h2>Discovery</h2>
+              <div className="subtext">Find verified campaigns by category, traction, creator reputation, and search.</div>
             </div>
-            <span className="badge">{n} total</span>
+            <span className="badge">{visibleCampaigns.length} shown</span>
           </div>
 
-          <div className="row spread">
+          <div className="discovery-panel">
+            <div className="discovery-controls">
+              <label className="search-box">
+                <Search size={16} />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search campaigns, creators, or addresses"
+                />
+              </label>
+              <label className="field compact-field">
+                <span>Category</span>
+                <select value={category} onChange={(e) => setCategory(e.target.value as DiscoveryCategory)}>
+                  {DISCOVERY_CATEGORIES.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field compact-field">
+                <span>Sort</span>
+                <select value={sortMode} onChange={(e) => setSortMode(e.target.value as SortMode)}>
+                  <option value="trending">Trending</option>
+                  <option value="newest">Newest</option>
+                  <option value="goal">Highest goal</option>
+                </select>
+              </label>
+            </div>
+            <div className="row spread">
+              <div className="fineprint">
+                Discovery starts after the first {DISCOVERY_SKIP_FACTORY_INDEXES} cleanup-era campaigns and scans newest campaigns first.
+              </div>
+              <div className="row">
+                {verifyingCampaigns > 0 ? <span className="badge">{verifyingCampaigns} verifying goal</span> : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="row spread section-gap">
             <label className="check-row">
               <input type="checkbox" checked={showCompleted} onChange={(e) => setShowCompleted(e.target.checked)} />
               Show completed
@@ -418,76 +653,71 @@ export default function HomePage() {
           <div className="divider" />
 
           <div className="stack">
-            {(campaignAddrs.data ?? []).map((r, idx) => {
-              const addr = r.status === "success" ? (r.result as `0x${string}`) : "";
-              if (!addr) return <div key={idx} className="subtext">Loading…</div>;
-
-              const titleIndex = idx * 4;
-              const withdrawIndex = idx * 4 + 2;
-              const creatorIndex = idx * 4 + 3;
-
-              const name =
-                metas.data?.[titleIndex]?.status === "success"
-                  ? (metas.data?.[titleIndex]?.result as string)
-                  : "Campaign";
-
-              const requested = totalsByCampaign.get(addr) ?? 0n;
-
-              const totalWithdrawn =
-                metas.data?.[withdrawIndex]?.status === "success"
-                  ? (metas.data?.[withdrawIndex]?.result as bigint)
-                  : 0n;
-              const creator =
-                metas.data?.[creatorIndex]?.status === "success"
-                  ? (metas.data?.[creatorIndex]?.result as `0x${string}`)
-                  : undefined;
-              const creatorReputation = creator
-                ? reputation.creators.find((item) => item.creator.toLowerCase() === creator.toLowerCase())
-                : undefined;
-
-              const isCompleted = requested > 0n && totalWithdrawn >= requested;
-              const isSpamCampaign = requested < MIN_VISIBLE_CAMPAIGN_USDC;
-
-              if (isSpamCampaign) return null;
-              if (!showCompleted && isCompleted) return null;
+            {listLoading ? <div className="status-card">Loading campaign discovery once. This may take a moment after the spam cleanup.</div> : null}
+            {!listLoading && visibleCampaigns.length === 0 ? (
+              <div className="status-card">No verified campaigns match these discovery filters.</div>
+            ) : null}
+            {visibleCampaigns.map((campaign) => {
+              const isCompleted =
+                campaign.requestedResolved &&
+                campaign.requested > 0n &&
+                campaign.totalWithdrawn >= campaign.requested;
 
               return (
-                <div key={addr} className="kv campaign-item">
+                <div key={campaign.addr} className="kv campaign-item">
                   <div style={{ minWidth: 0 }}>
                     <div className="k">
-                      {name}{" "}
+                      {campaign.title}{" "}
                       {isCompleted ? <span className="badge badge-success" style={{ marginLeft: 8 }}>Completed</span> : null}
+                      {campaign.category ? <span className="badge" style={{ marginLeft: 8 }}>{campaign.category}</span> : null}
                     </div>
                     <div className="v mono address-line">
-                      {addr}
+                      {campaign.addr}
                     </div>
-                    {creator ? (
+                    {campaign.creator ? (
                       <div className="subtext" style={{ marginTop: 4 }}>
-                        Creator: <ArcNameLabel address={creator} className="mono" />
+                        Creator: <ArcNameLabel address={campaign.creator} className="mono" />
                       </div>
                     ) : null}
-                    {creatorReputation ? (
-                      <div style={{ marginTop: 6 }}>
-                        <CreatorReputationInline reputation={creatorReputation} />
-                      </div>
+                    {campaign.description ? (
+                      <div className="subtext campaign-description">{campaign.description}</div>
                     ) : null}
                     <div className="subtext" style={{ marginTop: 4 }}>
-                      Requested: {formatUnits(requested, 6)} USDC • Withdrawn:{" "}
-                      {formatUnits(totalWithdrawn, 6)} USDC
+                      Requested:{" "}
+                      {campaign.requestedResolved ? `${formatUnits(campaign.requested, 6)} USDC` : "loading goal"} •
+                      Raised: {formatUnits(campaign.totalRaised, 6)} USDC • Withdrawn:{" "}
+                      {formatUnits(campaign.totalWithdrawn, 6)} USDC
                     </div>
                   </div>
 
                   <div className="actions">
-                    <Link className="btn btn-primary btn-sm" href={`/campaign/${addr}`}>
+                    <Link className="btn btn-primary btn-sm" href={`/campaign/${campaign.addr}`}>
                       Open
                     </Link>
-                    <a className="btn btn-sm" href={explorerAddress(addr)} target="_blank" rel="noreferrer">
+                    {campaign.creator ? (
+                      <Link className="btn btn-sm" href={`/creator/${campaign.creator}`}>
+                        Reputation <ShieldCheck size={16} />
+                      </Link>
+                    ) : null}
+                    <a className="btn btn-sm" href={shareUrl(campaign.addr, campaign.title)} target="_blank" rel="noreferrer">
+                      Share <Share2 size={16} />
+                    </a>
+                    <a className="btn btn-sm" href={explorerAddress(campaign.addr)} target="_blank" rel="noreferrer">
                       ArcScan <ExternalLink size={16} />
                     </a>
                   </div>
                 </div>
               );
             })}
+            {hasMoreCampaigns ? (
+              <button
+                className="btn btn-block"
+                type="button"
+                onClick={() => setScanCount((current) => Math.min(n, current + CAMPAIGN_SCAN_STEP))}
+              >
+                Scan older campaigns
+              </button>
+            ) : null}
           </div>
         </section>
       </div>

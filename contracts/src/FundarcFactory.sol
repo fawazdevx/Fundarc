@@ -18,6 +18,10 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
     uint256 public constant DEFAULT_MINIMUM_CAMPAIGN_GOAL = 100 * 1e6;
     uint256 public constant DEFAULT_CAMPAIGN_CREATION_FEE = 10 * 1e6;
     uint40 public constant DEFAULT_FUNDING_PERIOD = 30 days;
+    uint256 public constant MAX_MILESTONES = 12;
+    uint256 public constant MAX_TITLE_BYTES = 96;
+    uint256 public constant MAX_DESCRIPTION_BYTES = 2_000;
+    uint40 public constant MAX_VOTING_PERIOD = 30 days;
 
     event CampaignCreated(address indexed creator, address indexed campaign, uint256 indexed campaignId);
     event FeeConfigUpdated(uint16 feeBps, address feeTreasury);
@@ -135,6 +139,11 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
         uint16 passBps
     ) external nonReentrant returns (address campaign) {
         require(!campaignCreationPaused, "CREATION_PAUSED");
+        require(bytes(title).length > 0 && bytes(title).length <= MAX_TITLE_BYTES, "BAD_TITLE");
+        require(bytes(description).length > 0 && bytes(description).length <= MAX_DESCRIPTION_BYTES, "BAD_DESCRIPTION");
+        require(milestoneAmounts.length > 0 && milestoneAmounts.length <= MAX_MILESTONES, "BAD_MILESTONES");
+        require(votingPeriod >= 1 hours && votingPeriod <= MAX_VOTING_PERIOD, "BAD_VOTING_PERIOD");
+        require(quorumBps <= 10_000 && passBps <= 10_000, "BPS");
 
         uint256 totalGoal = 0;
         for (uint256 i = 0; i < milestoneAmounts.length; i++) {

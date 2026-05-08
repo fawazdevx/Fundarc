@@ -73,6 +73,28 @@ contract FundarcSecurityTest is Test {
         factory.createCampaign("Tiny", "Too small", milestones, 1 days, 2_000, 6_000);
     }
 
+    function testCreateCampaignRejectsTooManyMilestones() external {
+        vm.prank(creator);
+        vm.expectRevert("BAD_MILESTONES");
+        factory.createCampaign("Too many", "Too many milestones", _manyMilestones(13, 100 * USDC), 1 days, 2_000, 6_000);
+    }
+
+    function testCreateCampaignRejectsOversizedMetadata() external {
+        vm.prank(creator);
+        vm.expectRevert("BAD_TITLE");
+        factory.createCampaign(_repeat("x", 97), "Valid description", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+
+        vm.prank(creator);
+        vm.expectRevert("BAD_DESCRIPTION");
+        factory.createCampaign("Valid title", _repeat("x", 2_001), _milestones(100 * USDC), 1 days, 2_000, 6_000);
+    }
+
+    function testCreateCampaignRejectsExtremeVotingPeriod() external {
+        vm.prank(creator);
+        vm.expectRevert("BAD_VOTING_PERIOD");
+        factory.createCampaign("Slow vote", "Too long", _milestones(100 * USDC), 31 days, 2_000, 6_000);
+    }
+
     function testCreateCampaignCanBePausedOnchain() external {
         vm.prank(owner);
         factory.setCampaignCreationPaused(true);
@@ -105,6 +127,18 @@ contract FundarcSecurityTest is Test {
         usdc.approve(campaignAddress, 10 * USDC);
         vm.expectRevert("FUNDING_CLOSED");
         FundarcCampaign(campaignAddress).contribute(10 * USDC);
+        vm.stopPrank();
+    }
+
+    function testContributionRejectsAmountsBelowMinimum() external {
+        vm.prank(creator);
+        address campaignAddress =
+            factory.createCampaign("Minimum", "Minimum contribution", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+
+        vm.startPrank(funder1);
+        usdc.approve(campaignAddress, 9 * USDC);
+        vm.expectRevert("CONTRIBUTION_TOO_LOW");
+        FundarcCampaign(campaignAddress).contribute(9 * USDC);
         vm.stopPrank();
     }
 
@@ -156,5 +190,22 @@ contract FundarcSecurityTest is Test {
     function _milestones(uint256 amount) internal pure returns (uint96[] memory milestones) {
         milestones = new uint96[](1);
         milestones[0] = uint96(amount);
+    }
+
+    function _manyMilestones(uint256 count, uint256 totalAmount) internal pure returns (uint96[] memory milestones) {
+        milestones = new uint96[](count);
+        uint96 amount = uint96(totalAmount / count);
+        for (uint256 i = 0; i < count; i++) {
+            milestones[i] = amount;
+        }
+    }
+
+    function _repeat(string memory char, uint256 count) internal pure returns (string memory) {
+        bytes memory charBytes = bytes(char);
+        bytes memory result = new bytes(count);
+        for (uint256 i = 0; i < count; i++) {
+            result[i] = charBytes[0];
+        }
+        return string(result);
     }
 }

@@ -16,6 +16,12 @@ interface IFundarcFactory {
 }
 
 contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUpgradeable {
+    uint256 public constant MAX_MILESTONES = 12;
+    uint256 public constant MAX_TITLE_BYTES = 96;
+    uint256 public constant MAX_DESCRIPTION_BYTES = 2_000;
+    uint40 public constant MAX_VOTING_PERIOD = 30 days;
+    uint256 public constant MINIMUM_CONTRIBUTION = 10 * 1e6;
+
     enum CampaignState {
         Active,
         Canceled,
@@ -108,8 +114,12 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
         require(_creator != address(0), "BAD_CREATOR");
         require(_usdc != address(0), "BAD_USDC");
         require(_factory != address(0), "BAD_FACTORY");
-        require(milestoneAmounts.length > 0, "NO_MILESTONES");
-        require(_votingPeriod >= 1 hours, "VOTE_TOO_SHORT");
+        require(bytes(_title).length > 0 && bytes(_title).length <= MAX_TITLE_BYTES, "BAD_TITLE");
+        require(
+            bytes(_description).length > 0 && bytes(_description).length <= MAX_DESCRIPTION_BYTES, "BAD_DESCRIPTION"
+        );
+        require(milestoneAmounts.length > 0 && milestoneAmounts.length <= MAX_MILESTONES, "BAD_MILESTONES");
+        require(_votingPeriod >= 1 hours && _votingPeriod <= MAX_VOTING_PERIOD, "BAD_VOTING_PERIOD");
         require(_quorumBps <= 10_000 && _passBps <= 10_000, "BPS");
 
         __ReentrancyGuard_init();
@@ -173,7 +183,7 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
     }
 
     function contribute(uint256 amount) external nonReentrant inState(CampaignState.Active) {
-        require(amount > 0, "AMOUNT=0");
+        require(amount >= MINIMUM_CONTRIBUTION, "CONTRIBUTION_TOO_LOW");
         require(fundingDeadline == 0 || block.timestamp <= fundingDeadline, "FUNDING_CLOSED");
         require(usdc.transferFrom(msg.sender, address(this), amount), "TRANSFER_FROM_FAIL");
 
