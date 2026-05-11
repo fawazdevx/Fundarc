@@ -32,8 +32,11 @@ export default function LandingPage() {
 
           <h1 className="landing-title">Fundarc</h1>
           <p className="landing-copy">
-            Stablecoin crowdfunding with milestone voting, transparent creator history, and refund-aware campaign
-            flows built for public goods, open source, creators, and communities.
+            Programmable USDC-native milestone funding for internet-native builders, open-source projects, 
+            creators, and communities - with milestone voting, transparent creator history, and 
+            refund-aware funding flows.
+
+
           </p>
 
           <div className="landing-actions">
