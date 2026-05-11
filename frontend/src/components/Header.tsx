@@ -3,20 +3,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { ConnectButton, useAccountModal } from "@rainbow-me/rainbowkit";
-import { useDisconnect, useReadContracts } from "wagmi";
-import { formatUnits } from "viem";
+import { useDisconnect } from "wagmi";
 import { useANSReverse } from "@arcnames/sdk-react";
-import { fundarcFactoryAbi } from "@/src/abi/factory";
-import { BarChart3, ChevronDown, Coins, ExternalLink, LogOut, Rocket } from "lucide-react";
-
-const FACTORY = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`;
-const EXPLORER = process.env.NEXT_PUBLIC_EXPLORER!;
-
-function addrUrl(a: string) {
-  return `${EXPLORER}/address/${a}`;
-}
+import { BarChart3, ChevronDown, LogOut, Rocket } from "lucide-react";
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -118,49 +110,26 @@ function FundarcConnectButton() {
 }
 
 export function Header() {
-  const reads = useReadContracts({
-    contracts: [
-      { abi: fundarcFactoryAbi, address: FACTORY, functionName: "feeBps" },
-      { abi: fundarcFactoryAbi, address: FACTORY, functionName: "feeTreasury" },
-      { abi: fundarcFactoryAbi, address: FACTORY, functionName: "totalFeesCollected" },
-    ],
-  });
-
-  const feeBps =
-    reads.data?.[0]?.status === "success"
-      ? Number(reads.data?.[0].result ?? 0n)
-      : 0;
-  const treasury = (reads.data?.[1]?.status === "success" ? (reads.data?.[1].result as string) : undefined) as
-    | string
-    | undefined;
-  const totalFees = (reads.data?.[2]?.status === "success" ? (reads.data?.[2].result as bigint) : 0n) ?? 0n;
-
-  const feePct = feeBps / 100;
-
   return (
     <div className="header">
       <div className="header-inner">
         <div className="brand">
           <Link href="/" className="hero-title">
+            <Image
+              src="/brand/favicon.svg"
+              alt=""
+              width={34}
+              height={34}
+              priority
+              aria-hidden="true"
+              className="brand-mark"
+            />
             Fundarc
           </Link>
 
           <small>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <Coins size={14} />
-              Fee: <span className="mono">{feePct.toFixed(2)}%</span> • Revenue:{" "}
-              <span className="mono">{formatUnits(totalFees, 6)} USDC</span>
-            </span>
-
-            {treasury ? (
-              <>
-                {" "}
-                •{" "}
-                <a href={addrUrl(treasury)} target="_blank" rel="noreferrer" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                  Treasury <ExternalLink size={14} />
-                </a>
-              </>
-            ) : null}
+            <span className="status-dot" aria-hidden="true" />
+            Built on Arc Testnet
           </small>
         </div>
 
