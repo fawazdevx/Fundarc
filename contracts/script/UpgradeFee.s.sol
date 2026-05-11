@@ -7,7 +7,7 @@ import {FundarcFactory} from "../src/FundarcFactory.sol";
 
 contract UpgradeFee is Script {
     uint256 internal constant DEFAULT_MIN_CAMPAIGN_GOAL = 100 * 1e6;
-    uint256 internal constant DEFAULT_CREATION_FEE = 0;
+    uint256 internal constant DEFAULT_CREATION_FEE = 10 * 1e6;
     uint40 internal constant DEFAULT_FUNDING_PERIOD = 30 days;
 
     function run() external {

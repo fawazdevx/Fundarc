@@ -5,6 +5,7 @@ import { formatUnits } from "viem";
 import { useReadContract, useReadContracts } from "wagmi";
 import { fundarcCampaignAbi } from "@/src/abi/campaign";
 import { fundarcFactoryAbi } from "@/src/abi/factory";
+import { HIDDEN_LEGACY_CAMPAIGN_COUNT } from "@/src/config/campaigns";
 
 const FACTORY = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`;
 
@@ -131,16 +132,17 @@ export function useCreatorReputation(targetCreator?: string) {
   });
 
   const campaignCount = Number(count.data ?? 0n);
+  const visibleCampaignCount = Math.max(0, campaignCount - HIDDEN_LEGACY_CAMPAIGN_COUNT);
 
   const campaignReads = useMemo(
     () =>
-      Array.from({ length: campaignCount }, (_, i) => ({
+      Array.from({ length: visibleCampaignCount }, (_, i) => ({
         abi: fundarcFactoryAbi,
         address: FACTORY,
         functionName: "campaigns" as const,
-        args: [BigInt(i)] as const,
+        args: [BigInt(HIDDEN_LEGACY_CAMPAIGN_COUNT + i)] as const,
       })),
-    [campaignCount]
+    [visibleCampaignCount]
   );
 
   const campaignAddresses = useReadContracts({

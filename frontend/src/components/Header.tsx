@@ -2,13 +2,14 @@
 
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useReadContracts } from "wagmi";
+import { ConnectButton, useAccountModal } from "@rainbow-me/rainbowkit";
+import { useDisconnect, useReadContracts } from "wagmi";
 import { formatUnits } from "viem";
 import { useANSReverse } from "@arcnames/sdk-react";
 import { fundarcFactoryAbi } from "@/src/abi/factory";
-import { Coins, ExternalLink } from "lucide-react";
+import { BarChart3, ChevronDown, Coins, ExternalLink, LogOut, Rocket } from "lucide-react";
 
 const FACTORY = process.env.NEXT_PUBLIC_FACTORY_ADDRESS as `0x${string}`;
 const EXPLORER = process.env.NEXT_PUBLIC_EXPLORER!;
@@ -23,21 +24,67 @@ function shortAddress(address: string) {
 
 function WalletAccountButton({
   account,
-  openAccountModal,
 }: {
   account: {
     address: string;
     displayBalance?: string;
   };
-  openAccountModal: () => void;
 }) {
+  const [fallbackOpen, setFallbackOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { arcName } = useANSReverse(account.address);
+  const { openAccountModal } = useAccountModal();
+  const { disconnect } = useDisconnect();
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setFallbackOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
+
+  function handleAccountClick() {
+    if (openAccountModal) {
+      openAccountModal();
+      setFallbackOpen(false);
+      return;
+    }
+
+    setFallbackOpen((open) => !open);
+  }
+
+  function handleDisconnect() {
+    disconnect();
+    setFallbackOpen(false);
+  }
 
   return (
-    <button className="btn btn-primary" type="button" onClick={openAccountModal}>
-      <span className="mono">{arcName ?? shortAddress(account.address)}</span>
-      {account.displayBalance ? <span className="badge">{account.displayBalance}</span> : null}
-    </button>
+    <div className="wallet-account-menu" ref={menuRef}>
+      <button
+        aria-expanded={fallbackOpen}
+        aria-haspopup="menu"
+        className="btn btn-primary wallet-account-trigger"
+        type="button"
+        onClick={handleAccountClick}
+      >
+        <span className="mono">{arcName ?? shortAddress(account.address)}</span>
+        {account.displayBalance ? <span className="badge">{account.displayBalance}</span> : null}
+        <ChevronDown size={16} aria-hidden="true" />
+      </button>
+
+      {fallbackOpen ? (
+        <div className="wallet-account-popover" role="menu">
+          <button className="wallet-account-action" type="button" role="menuitem" onClick={handleDisconnect}>
+            <LogOut size={16} aria-hidden="true" />
+            Disconnect
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -64,7 +111,7 @@ function FundarcConnectButton() {
           );
         }
 
-        return <WalletAccountButton account={account} openAccountModal={openAccountModal} />;
+        return <WalletAccountButton account={account} />;
       }}
     </ConnectButton.Custom>
   );
@@ -117,8 +164,15 @@ export function Header() {
           </small>
         </div>
 
-        {/* Keep RK aligned and not cramped */}
         <div className="wallet-slot">
+          <Link className="btn btn-sm" href="/launch">
+            <Rocket size={16} />
+            Launch dApp
+          </Link>
+          <Link className="btn btn-sm" href="/dashboard">
+            <BarChart3 size={16} />
+            Metrics
+          </Link>
           <FundarcConnectButton />
         </div>
       </div>

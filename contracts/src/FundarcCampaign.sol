@@ -13,6 +13,7 @@ import {IERC20Minimal} from "./interfaces/IERC20Minimal.sol";
 interface IFundarcFactory {
     function feeBps() external view returns (uint16);
     function takeFee(uint256 feeAmount) external returns (bool);
+    function clearCreatorActiveCampaign(address creator) external;
 }
 
 contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUpgradeable {
@@ -51,6 +52,7 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
     event Refunded(address indexed funder, uint256 amount);
     event Canceled();
     event MilestoneSubmitted(uint256 indexed index, bytes32 evidenceHash, uint40 voteStart, uint40 voteEnd);
+    event MilestoneEvidenceURIUpdated(uint256 indexed index, string evidenceURI);
     event Voted(address indexed funder, uint256 indexed index, bool support, uint256 weight);
     event MilestoneFinalized(uint256 indexed index, bool approved);
     event Withdrawn(address indexed creator, uint256 amount);
@@ -76,6 +78,7 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
 
     Milestone[] public milestones;
     uint256 public currentMilestone;
+    mapping(uint256 => string) public milestoneEvidenceURI;
 
     mapping(uint256 => mapping(address => uint8)) public voteChoice;
 
@@ -210,12 +213,27 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
     function cancel() external onlyCreator inState(CampaignState.Active) {
         require(totalWithdrawn == 0, "ALREADY_WITHDRAWN");
         campaignState = CampaignState.Canceled;
+        _clearCreatorActiveCampaign();
         emit Canceled();
     }
 
     function submitMilestone(bytes32 evidenceHash) external onlyCreator inState(CampaignState.Active) {
+        _submitMilestone(evidenceHash, "");
+    }
+
+    function submitMilestoneWithEvidence(bytes32 evidenceHash, string calldata evidenceURI)
+        external
+        onlyCreator
+        inState(CampaignState.Active)
+    {
+        require(bytes(evidenceURI).length > 0 && bytes(evidenceURI).length <= MAX_DESCRIPTION_BYTES, "BAD_EVIDENCE_URI");
+        _submitMilestone(evidenceHash, evidenceURI);
+    }
+
+    function _submitMilestone(bytes32 evidenceHash, string memory evidenceURI) internal {
         Milestone storage m = milestones[currentMilestone];
         require(m.state == MilestoneState.PendingSubmission, "NOT_PENDING");
+        require(totalRaised >= unlockedAmount + uint256(m.amount), "MILESTONE_FUNDS_NOT_AVAILABLE");
 
         uint40 start = uint40(block.timestamp);
         uint40 end = start + votingPeriod;
@@ -224,6 +242,11 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
         m.voteStart = start;
         m.voteEnd = end;
         m.state = MilestoneState.Voting;
+
+        if (bytes(evidenceURI).length > 0) {
+            milestoneEvidenceURI[currentMilestone] = evidenceURI;
+            emit MilestoneEvidenceURIUpdated(currentMilestone, evidenceURI);
+        }
 
         emit MilestoneSubmitted(currentMilestone, evidenceHash, start, end);
     }
@@ -274,14 +297,20 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
 
             if (currentMilestone + 1 == milestones.length) {
                 campaignState = CampaignState.Successful;
+                _clearCreatorActiveCampaign();
             } else {
                 currentMilestone += 1;
             }
         } else {
             m.state = MilestoneState.Rejected;
             campaignState = CampaignState.Failed;
+            _clearCreatorActiveCampaign();
             emit MilestoneFinalized(milestoneIndex, false);
         }
+    }
+
+    function _clearCreatorActiveCampaign() internal {
+        try IFundarcFactory(factory).clearCreatorActiveCampaign(creator) {} catch {}
     }
 
     function withdrawUnlocked(uint256 amount) external nonReentrant onlyCreator {

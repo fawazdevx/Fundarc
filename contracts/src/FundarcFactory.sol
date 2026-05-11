@@ -30,6 +30,7 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
     event CampaignCreationFeeUpdated(uint256 campaignCreationFee);
     event CampaignCreationFeePaid(address indexed creator, uint256 feeAmount);
     event DefaultFundingPeriodUpdated(uint40 defaultFundingPeriod);
+    event CreatorActiveCampaignUpdated(address indexed creator, address indexed campaign);
 
     /// @notice Emitted whenever protocol fees are collected.
     /// @param campaign The campaign (msg.sender) that paid the fee.
@@ -48,6 +49,7 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
     bool public campaignCreationPaused;
     uint256 public campaignCreationFee;
     uint40 public defaultFundingPeriod;
+    mapping(address => address) public activeCampaignByCreator;
 
     function initialize(
         address _owner,
@@ -84,6 +86,24 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
 
     function campaignsCount() external view returns (uint256) {
         return campaigns.length;
+    }
+
+    function clearCreatorActiveCampaign(address creator) external {
+        if (activeCampaignByCreator[creator] != msg.sender) return;
+        delete activeCampaignByCreator[creator];
+        emit CreatorActiveCampaignUpdated(creator, address(0));
+    }
+
+    function setCreatorActiveCampaign(address creator, address campaign) external onlyOwner {
+        require(creator != address(0), "BAD_CREATOR");
+
+        if (campaign != address(0)) {
+            require(FundarcCampaign(campaign).creator() == creator, "CREATOR_MISMATCH");
+            require(FundarcCampaign(campaign).campaignState() == FundarcCampaign.CampaignState.Active, "NOT_ACTIVE");
+        }
+
+        activeCampaignByCreator[creator] = campaign;
+        emit CreatorActiveCampaignUpdated(creator, campaign);
     }
 
     function setCampaignImplementation(address impl) external onlyOwner {
@@ -139,6 +159,16 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
         uint16 passBps
     ) external nonReentrant returns (address campaign) {
         require(!campaignCreationPaused, "CREATION_PAUSED");
+        address activeCampaign = activeCampaignByCreator[msg.sender];
+        if (activeCampaign != address(0)) {
+            try FundarcCampaign(activeCampaign).campaignState() returns (FundarcCampaign.CampaignState state) {
+                require(state != FundarcCampaign.CampaignState.Active, "ACTIVE_CAMPAIGN_EXISTS");
+                delete activeCampaignByCreator[msg.sender];
+                emit CreatorActiveCampaignUpdated(msg.sender, address(0));
+            } catch {
+                revert("ACTIVE_CAMPAIGN_EXISTS");
+            }
+        }
         require(bytes(title).length > 0 && bytes(title).length <= MAX_TITLE_BYTES, "BAD_TITLE");
         require(bytes(description).length > 0 && bytes(description).length <= MAX_DESCRIPTION_BYTES, "BAD_DESCRIPTION");
         require(milestoneAmounts.length > 0 && milestoneAmounts.length <= MAX_MILESTONES, "BAD_MILESTONES");
@@ -174,6 +204,8 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
             );
 
         campaigns.push(campaign);
+        activeCampaignByCreator[msg.sender] = campaign;
         emit CampaignCreated(msg.sender, campaign, campaigns.length - 1);
+        emit CreatorActiveCampaignUpdated(msg.sender, campaign);
     }
 }

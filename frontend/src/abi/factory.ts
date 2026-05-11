@@ -13,6 +13,15 @@ export const fundarcFactoryAbi = [
     anonymous: false,
   },
   {
+    type: "event",
+    name: "CreatorActiveCampaignUpdated",
+    inputs: [
+      { indexed: true, name: "creator", type: "address" },
+      { indexed: true, name: "campaign", type: "address" },
+    ],
+    anonymous: false,
+  },
+  {
     type: "function",
     name: "createCampaign",
     stateMutability: "nonpayable",
@@ -28,6 +37,17 @@ export const fundarcFactoryAbi = [
   },
   { type: "function", name: "campaigns", stateMutability: "view", inputs: [{ name: "", type: "uint256" }], outputs: [{ name: "", type: "address" }] },
   { type: "function", name: "campaignsCount", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
+  { type: "function", name: "activeCampaignByCreator", stateMutability: "view", inputs: [{ name: "", type: "address" }], outputs: [{ name: "", type: "address" }] },
+  {
+    type: "function",
+    name: "setCreatorActiveCampaign",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "creator", type: "address" },
+      { name: "campaign", type: "address" },
+    ],
+    outputs: [],
+  },
 
   // fees / revenue
   { type: "function", name: "feeBps", stateMutability: "view", inputs: [], outputs: [{ type: "uint16" }] },

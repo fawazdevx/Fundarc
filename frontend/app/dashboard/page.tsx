@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPublicClient, http, formatUnits, parseAbiItem } from "viem";
 import { useReadContracts } from "wagmi";
 import { fundarcFactoryAbi } from "@/src/abi/factory";
+import { HIDDEN_LEGACY_CAMPAIGN_COUNT } from "@/src/config/campaigns";
 import type { AbiEvent } from "viem";
 import {
   ResponsiveContainer,
@@ -138,6 +139,9 @@ async function fetchDashboard(range: RangeKey) {
 
   // Apply CampaignCreated logs
   for (const l of createdLogs) {
+    const campaignId = (l.args as any)?.campaignId as bigint | undefined;
+    if (campaignId !== undefined && campaignId < BigInt(HIDDEN_LEGACY_CAMPAIGN_COUNT)) continue;
+
     const ts = blockTs.get(l.blockNumber!) ?? 0;
     if (ts < startDay || ts > endSec) continue;
 
@@ -183,6 +187,10 @@ export default function DashboardPage() {
 
   const lifetimeCampaigns =
     summaryReads.data?.[0]?.status === "success" ? (summaryReads.data[0].result as bigint) : 0n;
+  const visibleLifetimeCampaigns =
+    lifetimeCampaigns > BigInt(HIDDEN_LEGACY_CAMPAIGN_COUNT)
+      ? lifetimeCampaigns - BigInt(HIDDEN_LEGACY_CAMPAIGN_COUNT)
+      : 0n;
   const lifetimeRevenue =
     summaryReads.data?.[1]?.status === "success" ? (summaryReads.data[1].result as bigint) : 0n;
 
@@ -245,7 +253,7 @@ export default function DashboardPage() {
         <div className="divider" />
 
         <div className="row">
-          <span className="badge">Campaigns created: {lifetimeCampaigns.toString()}</span>
+          <span className="badge">Campaigns created: {visibleLifetimeCampaigns.toString()}</span>
           <span className="badge">Revenue generated: {formatUnits(lifetimeRevenue, USDC_DECIMALS)} USDC</span>
           <span className="badge">{range} campaigns: {totals.campaigns}</span>
           <span className="badge">{range} revenue: {totals.revenue.toFixed(2)} USDC</span>

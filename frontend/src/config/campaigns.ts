@@ -1,0 +1,5 @@
+export const CAMPAIGN_START_INDEX = Number(
+  process.env.NEXT_PUBLIC_CAMPAIGN_START_INDEX ?? "260"
+);
+
+export const HIDDEN_LEGACY_CAMPAIGN_COUNT = Math.max(0, CAMPAIGN_START_INDEX);

@@ -25,6 +25,7 @@ import {
   ThumbsDown,
   ThumbsUp,
   Flag,
+  Upload,
   Send,
   Wallet,
 } from "lucide-react";
@@ -131,6 +132,21 @@ function secondsToHuman(secs: number) {
   return parts.join(" ");
 }
 
+function formatCreatedAt(timestamp: number) {
+  if (!timestamp) return "Creation time unavailable";
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(timestamp * 1000));
+}
+
+function campaignStateLabel(state: number) {
+  if (state === 1) return "Canceled";
+  if (state === 2) return "Failed";
+  if (state === 3) return "Successful";
+  return "Active";
+}
+
 type MilestoneObj = {
   amount: bigint;
   voteStart: bigint;
@@ -145,6 +161,15 @@ type Contributor = {
   address: `0x${string}`;
   amount: bigint;
   contributions: number;
+};
+
+type EvidenceUploadResponse = {
+  cid: string;
+  uri: string;
+  hash: `0x${string}`;
+  name: string;
+  size: number;
+  type: string;
 };
 
 function asBigint(v: unknown): bigint {
@@ -167,6 +192,11 @@ function isBytes32Hex(value: string) {
   return /^0x[0-9a-fA-F]{64}$/.test(value);
 }
 
+function ipfsUrl(uri: string) {
+  if (!uri.startsWith("ipfs://")) return uri;
+  return `https://gateway.pinata.cloud/ipfs/${uri.replace("ipfs://", "")}`;
+}
+
 export default function CampaignPageClient({ addr }: { addr: string }) {
   const campaign = addr as `0x${string}`;
 
@@ -176,6 +206,8 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
 
   const [contribution, setContribution] = useState("10");
   const [evidenceHash, setEvidenceHash] = useState<string>(zeroHash);
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [evidenceUpload, setEvidenceUpload] = useState<EvidenceUploadResponse | null>(null);
   const [withdrawAmt, setWithdrawAmt] = useState("1");
   const [contributors, setContributors] = useState<Contributor[]>([]);
   const [contributorsLoading, setContributorsLoading] = useState(false);
@@ -192,6 +224,9 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
       { abi: fundarcCampaignAbi, address: campaign, functionName: "totalWithdrawn" },
       { abi: fundarcCampaignAbi, address: campaign, functionName: "availableToWithdraw" },
       { abi: fundarcCampaignAbi, address: campaign, functionName: "milestoneCount" },
+      { abi: fundarcCampaignAbi, address: campaign, functionName: "createdAt" },
+      { abi: fundarcCampaignAbi, address: campaign, functionName: "campaignState" },
+      { abi: fundarcCampaignAbi, address: campaign, functionName: "currentMilestone" },
     ],
   });
 
@@ -231,6 +266,15 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
       ? (baseReads.data?.[7].result as bigint)
       : undefined) ?? 0n
   );
+  const createdAt = asNumber(
+    baseReads.data?.[8]?.status === "success" ? baseReads.data?.[8].result : 0
+  );
+  const campaignState = asNumber(
+    baseReads.data?.[9]?.status === "success" ? baseReads.data?.[9].result : 0
+  );
+  const currentMilestoneIndex = asNumber(
+    baseReads.data?.[10]?.status === "success" ? baseReads.data?.[10].result : 0
+  );
 
   const milestonesReads = useMemo(
     () =>
@@ -245,6 +289,22 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
 
   const milestones = useReadContracts({
     contracts: milestonesReads,
+    query: { enabled: milestoneCount > 0 },
+  });
+
+  const evidenceReads = useMemo(
+    () =>
+      Array.from({ length: milestoneCount }, (_, i) => ({
+        abi: fundarcCampaignAbi,
+        address: campaign,
+        functionName: "milestoneEvidenceURI" as const,
+        args: [BigInt(i)] as const,
+      })),
+    [milestoneCount, campaign]
+  );
+
+  const evidenceURIs = useReadContracts({
+    contracts: evidenceReads,
     query: { enabled: milestoneCount > 0 },
   });
 
@@ -356,6 +416,7 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
   function refetchCoreReads() {
     baseReads.refetch?.();
     milestones.refetch?.();
+    evidenceURIs.refetch?.();
     myContrib.refetch?.();
     myRefundable.refetch?.();
     allowance.refetch?.();
@@ -440,7 +501,43 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
   }
 
   async function submitMilestone() {
-    const hashValue = evidenceHash.trim();
+    const currentMilestoneRead = milestones.data?.[currentMilestoneIndex];
+    if (currentMilestoneRead?.status === "success") {
+      const milestone = currentMilestoneRead.result as unknown as MilestoneObj;
+      const requiredFunding = unlockedAmount + asBigint(milestone.amount);
+
+      if (totalRaised < requiredFunding) {
+        toast.error(
+          `Funds not available yet. This milestone needs ${formatUnits(requiredFunding, 6)} USDC funded before voting can start.`
+        );
+        return;
+      }
+    }
+
+    let hashValue = evidenceHash.trim();
+    let evidenceURI = evidenceUpload?.uri ?? "";
+
+    if (evidenceFile) {
+      const formData = new FormData();
+      formData.set("file", evidenceFile);
+
+      const uploadResponse = await fetch("/api/evidence", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadPayload = await uploadResponse.json();
+
+      if (!uploadResponse.ok) {
+        toast.error(uploadPayload?.error ?? "Failed to upload evidence.");
+        return;
+      }
+
+      const uploaded = uploadPayload as EvidenceUploadResponse;
+      setEvidenceUpload(uploaded);
+      hashValue = uploaded.hash;
+      evidenceURI = uploaded.uri;
+    }
+
     if (!isBytes32Hex(hashValue)) {
       toast.error("Evidence hash must be a valid 32-byte hex value (0x...).");
       return;
@@ -448,13 +545,17 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
 
     const toastId = toast.loading("Submitting milestone...");
     try {
+      const functionName = evidenceURI ? "submitMilestoneWithEvidence" : "submitMilestone";
       const hash = await writeContractAsync({
         abi: fundarcCampaignAbi,
         address: campaign,
-        functionName: "submitMilestone",
-        args: [hashValue as `0x${string}`],
+        functionName,
+        args: evidenceURI ? [hashValue as `0x${string}`, evidenceURI] : [hashValue as `0x${string}`],
       });
       await waitForReceipt(hash);
+      setEvidenceFile(null);
+      setEvidenceUpload(null);
+      setEvidenceHash(zeroHash);
       refetchAll();
       toast.success("Milestone submitted. Voting is now open.", { id: toastId });
     } catch (e: any) {
@@ -574,6 +675,9 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
                   ? "Loading…"
                   : `${formatUnits(totalRequested, 6)} USDC`}
             </div>
+            <div className="subtext" style={{ marginTop: 8 }}>
+              Created: {formatCreatedAt(createdAt)} • Status: {campaignStateLabel(campaignState)}
+            </div>
           </div>
 
           <div className="actions">
@@ -629,6 +733,14 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
             <div className="kv">
               <div className="k">Available to withdraw</div>
               <div className="v">{formatUnits(availableToWithdraw, 6)} USDC</div>
+            </div>
+            <div className="kv">
+              <div className="k">Created</div>
+              <div className="v">{formatCreatedAt(createdAt)}</div>
+            </div>
+            <div className="kv">
+              <div className="k">Status</div>
+              <div className="v">{campaignStateLabel(campaignState)}</div>
             </div>
             <div className="kv">
               <div className="k">My contributed</div>
@@ -774,7 +886,16 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
 
               const secondsLeft = Math.max(0, Number(voteEnd) - now);
 
-              const canSubmitMilestone = isCreator && !votingConfigured;
+              const isCurrentMilestone = idx === currentMilestoneIndex;
+              const requiredFunding = unlockedAmount + amount;
+              const hasFundingForMilestone = totalRaised >= requiredFunding;
+              const canSubmitMilestone =
+                isCreator && isCurrentMilestone && !votingConfigured && hasFundingForMilestone;
+              const evidenceURI =
+                evidenceURIs.data?.[idx]?.status === "success" &&
+                typeof evidenceURIs.data[idx].result === "string"
+                  ? evidenceURIs.data[idx].result
+                  : "";
 
               let statusText = "Voting not started.";
               if (!votingConfigured) {
@@ -810,6 +931,12 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
                         {statusText}
                       </div>
 
+                      {!hasFundingForMilestone && isCurrentMilestone ? (
+                        <div className="subtext warn-text" style={{ marginTop: 6 }}>
+                          Funding needed before submission: {formatUnits(requiredFunding, 6)} USDC.
+                        </div>
+                      ) : null}
+
                       {votingConfigured ? (
                         <div className="subtext" style={{ marginTop: 6 }}>
                           window: {new Date(Number(voteStart) * 1000).toLocaleString()} →{" "}
@@ -820,6 +947,15 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
                       <div className="subtext" style={{ marginTop: 6 }}>
                         state={state} • voteStart={voteStart.toString()} • voteEnd={voteEnd.toString()}
                       </div>
+
+                      {evidenceURI ? (
+                        <div className="subtext" style={{ marginTop: 6 }}>
+                          Evidence:{" "}
+                          <a href={ipfsUrl(evidenceURI)} target="_blank" rel="noreferrer">
+                            {evidenceURI}
+                          </a>
+                        </div>
+                      ) : null}
                     </div>
 
                     <div style={{ textAlign: "right" }}>
@@ -869,20 +1005,41 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
                         className="row spread align-end"
                       >
                         <div className="field" style={{ flex: 1, minWidth: 260 }}>
-                          <label>Evidence hash (creator)</label>
+                          <label>Evidence hash or media proof</label>
                           <input
                             value={evidenceHash}
                             onChange={(e) => setEvidenceHash(e.target.value)}
                             placeholder="0x... (bytes32) or leave zeroHash for upfront."
                           />
+                          <input
+                            type="file"
+                            accept="image/*,video/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] ?? null;
+                              setEvidenceFile(file);
+                              setEvidenceUpload(null);
+                            }}
+                          />
+                          <div className="fineprint">
+                            {evidenceFile
+                              ? `${evidenceFile.name} will be uploaded as milestone evidence.`
+                              : "Images and videos are uploaded to IPFS; the hash and URI are submitted on-chain."}
+                          </div>
                         </div>
                         <div>
                           <button
                             className="btn btn-primary btn-lg"
                             onClick={submitMilestone}
                             disabled={isPending || !canSubmitMilestone || !isBytes32Hex(evidenceHash.trim())}
+                            title={
+                              !isCurrentMilestone
+                                ? "Only the current milestone can be submitted."
+                                : !hasFundingForMilestone
+                                  ? "Funds are not available for this milestone yet."
+                                  : ""
+                            }
                           >
-                            <Send size={18} />
+                            {evidenceFile ? <Upload size={18} /> : <Send size={18} />}
                             Submit milestone
                           </button>
                         </div>

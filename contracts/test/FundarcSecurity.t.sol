@@ -114,6 +114,104 @@ contract FundarcSecurityTest is Test {
         assertEq(factory.totalFeesCollected(), factory.campaignCreationFee());
     }
 
+    function testCreatorCannotCreateAnotherActiveCampaign() external {
+        vm.prank(creator);
+        address campaignAddress =
+            factory.createCampaign("One", "First active", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+
+        assertEq(factory.activeCampaignByCreator(creator), campaignAddress);
+
+        vm.prank(creator);
+        vm.expectRevert("ACTIVE_CAMPAIGN_EXISTS");
+        factory.createCampaign("Two", "Second active", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+    }
+
+    function testCreatorCanCreateAfterCampaignCanceled() external {
+        vm.prank(creator);
+        address campaignAddress =
+            factory.createCampaign("One", "First active", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+
+        vm.prank(creator);
+        FundarcCampaign(campaignAddress).cancel();
+
+        assertEq(factory.activeCampaignByCreator(creator), address(0));
+
+        vm.prank(creator);
+        address nextCampaign =
+            factory.createCampaign("Two", "After cancel", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+
+        assertEq(factory.activeCampaignByCreator(creator), nextCampaign);
+    }
+
+    function testCreatorCanCreateAfterCampaignSuccessful() external {
+        vm.prank(creator);
+        address campaignAddress =
+            factory.createCampaign("One", "First active", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+        FundarcCampaign campaign = FundarcCampaign(campaignAddress);
+
+        vm.startPrank(funder1);
+        usdc.approve(campaignAddress, 100 * USDC);
+        campaign.contribute(100 * USDC);
+        vm.stopPrank();
+
+        vm.prank(creator);
+        campaign.submitMilestone(bytes32("evidence"));
+
+        vm.prank(funder1);
+        campaign.vote(0, true);
+
+        vm.warp(block.timestamp + 1 days + 1);
+        campaign.finalizeMilestone(0);
+
+        assertEq(uint256(campaign.campaignState()), uint256(FundarcCampaign.CampaignState.Successful));
+        assertEq(factory.activeCampaignByCreator(creator), address(0));
+
+        vm.prank(creator);
+        address nextCampaign =
+            factory.createCampaign("Two", "After success", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+
+        assertEq(factory.activeCampaignByCreator(creator), nextCampaign);
+    }
+
+    function testCreatedAtIsSetAtCreationTime() external {
+        vm.warp(1_900_000_000);
+
+        vm.prank(creator);
+        address campaignAddress =
+            factory.createCampaign("Timestamp", "Created at", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+
+        assertEq(FundarcCampaign(campaignAddress).createdAt(), 1_900_000_000);
+    }
+
+    function testSubmitMilestoneStoresEvidenceURI() external {
+        vm.prank(creator);
+        address campaignAddress =
+            factory.createCampaign("Proof", "With media evidence", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+
+        vm.startPrank(funder1);
+        usdc.approve(campaignAddress, 100 * USDC);
+        FundarcCampaign(campaignAddress).contribute(100 * USDC);
+        vm.stopPrank();
+
+        vm.prank(creator);
+        FundarcCampaign(campaignAddress).submitMilestoneWithEvidence(
+            bytes32("evidence"),
+            "ipfs://bafybeigdyrztproof"
+        );
+
+        assertEq(FundarcCampaign(campaignAddress).milestoneEvidenceURI(0), "ipfs://bafybeigdyrztproof");
+    }
+
+    function testSubmitMilestoneRequiresAvailableFunding() external {
+        vm.prank(creator);
+        address campaignAddress =
+            factory.createCampaign("Unfunded", "No milestone funds yet", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+
+        vm.prank(creator);
+        vm.expectRevert("MILESTONE_FUNDS_NOT_AVAILABLE");
+        FundarcCampaign(campaignAddress).submitMilestone(bytes32("evidence"));
+    }
+
     function testFundingDeadlineBlocksLateContributions() external {
         vm.prank(owner);
         factory.setDefaultFundingPeriod(1 days);
@@ -183,6 +281,7 @@ contract FundarcSecurityTest is Test {
         campaign.finalizeMilestone(0);
 
         assertEq(uint256(campaign.campaignState()), uint256(FundarcCampaign.CampaignState.Successful));
+        assertEq(factory.activeCampaignByCreator(creator), address(0));
         assertEq(campaign.externalRaised(), 100 * USDC);
         assertEq(campaign.externalContributors(), 1);
     }
