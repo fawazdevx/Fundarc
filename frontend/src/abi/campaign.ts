@@ -52,8 +52,20 @@ export const fundarcCampaignAbi = [
   },
 
   { type: "function", name: "contributed", stateMutability: "view", inputs: [{ name: "", type: "address" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "voteDelegate", stateMutability: "view", inputs: [{ name: "", type: "address" }], outputs: [{ type: "address" }] },
+  {
+    type: "function",
+    name: "voteChoice",
+    stateMutability: "view",
+    inputs: [
+      { name: "", type: "uint256" },
+      { name: "", type: "address" },
+    ],
+    outputs: [{ type: "uint8" }],
+  },
 
   { type: "function", name: "contribute", stateMutability: "nonpayable", inputs: [{ name: "amount", type: "uint256" }], outputs: [] },
+  { type: "function", name: "setVoteDelegate", stateMutability: "nonpayable", inputs: [{ name: "delegate", type: "address" }], outputs: [] },
 
   { type: "function", name: "submitMilestone", stateMutability: "nonpayable", inputs: [{ name: "evidenceHash", type: "bytes32" }], outputs: [] },
   {
@@ -67,6 +79,17 @@ export const fundarcCampaignAbi = [
     outputs: [],
   },
   { type: "function", name: "vote", stateMutability: "nonpayable", inputs: [{ name: "milestoneIndex", type: "uint256" }, { name: "support", type: "bool" }], outputs: [] },
+  {
+    type: "function",
+    name: "voteFor",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "funder", type: "address" },
+      { name: "milestoneIndex", type: "uint256" },
+      { name: "support", type: "bool" },
+    ],
+    outputs: [],
+  },
   { type: "function", name: "finalizeMilestone", stateMutability: "nonpayable", inputs: [{ name: "milestoneIndex", type: "uint256" }], outputs: [] },
 
   { type: "function", name: "withdrawUnlocked", stateMutability: "nonpayable", inputs: [{ name: "amount", type: "uint256" }], outputs: [] },

@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { formatUnits, parseAbiItem, parseUnits, zeroHash } from "viem";
+import { formatUnits, isAddress, parseAbiItem, parseUnits, zeroAddress, zeroHash } from "viem";
 import type { AbiEvent } from "viem";
 import {
   useAccount,
@@ -19,6 +19,7 @@ import { erc20Abi } from "@/src/abi/erc20";
 import { ArcNameLabel } from "@/src/components/ArcNameLabel";
 import { CreatorReputationCard } from "@/src/components/CreatorReputationCard";
 import { useCreatorReputation } from "@/src/hooks/useCreatorReputation";
+import type { CreatorReputation, ReputationCampaign } from "@/src/hooks/useCreatorReputation";
 import {
   ExternalLink,
   RefreshCcw,
@@ -28,6 +29,9 @@ import {
   Upload,
   Send,
   Wallet,
+  Bot,
+  ShieldCheck,
+  WandSparkles,
 } from "lucide-react";
 
 const USDC = process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`;
@@ -172,6 +176,25 @@ type EvidenceUploadResponse = {
   type: string;
 };
 
+type MilestoneAgentReview = {
+  recommendation: "Approve" | "Reject" | "Wait";
+  tone: "success" | "warn" | "danger";
+  confidence: number;
+  summary: string;
+  checks: string[];
+  risks: string[];
+  nextSteps: string[];
+};
+
+type VotingAssistantPlan = {
+  ready: boolean;
+  suggestedSupport?: boolean;
+  label: string;
+  summary: string;
+  blockers: string[];
+  reasons: string[];
+};
+
 function asBigint(v: unknown): bigint {
   if (typeof v === "bigint") return v;
   if (typeof v === "number") return BigInt(v);
@@ -197,6 +220,253 @@ function ipfsUrl(uri: string) {
   return `https://gateway.pinata.cloud/ipfs/${uri.replace("ipfs://", "")}`;
 }
 
+function milestoneStateName(state: number) {
+  if (state === 1) return "Voting";
+  if (state === 2) return "Approved";
+  if (state === 3) return "Rejected";
+  if (state === 4) return "Finalized";
+  return "Pending submission";
+}
+
+function formatPercent(numerator: bigint, denominator: bigint) {
+  if (denominator <= 0n) return "0%";
+  return `${Number((numerator * 10_000n) / denominator / 100n)}%`;
+}
+
+function buildMilestoneAgentReview({
+  index,
+  amount,
+  state,
+  evidenceHash,
+  evidenceURI,
+  voteStart,
+  voteEnd,
+  yesWeight,
+  noWeight,
+  now,
+  totalRaised,
+  requiredFunding,
+  creatorReputation,
+  campaignHistory,
+}: {
+  index: number;
+  amount: bigint;
+  state: number;
+  evidenceHash: `0x${string}`;
+  evidenceURI: string;
+  voteStart: bigint;
+  voteEnd: bigint;
+  yesWeight: bigint;
+  noWeight: bigint;
+  now: number;
+  totalRaised: bigint;
+  requiredFunding: bigint;
+  creatorReputation?: CreatorReputation;
+  campaignHistory?: ReputationCampaign;
+}): MilestoneAgentReview {
+  const checks: string[] = [];
+  const risks: string[] = [];
+  const nextSteps: string[] = [];
+  const participated = yesWeight + noWeight;
+  const hasEvidenceHash = evidenceHash !== zeroHash;
+  const hasEvidence = hasEvidenceHash || evidenceURI.length > 0;
+  const votingConfigured = voteStart > 0n && voteEnd > 0n;
+  const isVotingLive = votingConfigured && BigInt(now) >= voteStart && BigInt(now) < voteEnd;
+  const hasVotingEnded = votingConfigured && BigInt(now) >= voteEnd;
+  const evidenceRequired = index > 0;
+  let score = 0;
+
+  if (totalRaised >= requiredFunding) {
+    checks.push(`Funding is available for this ${formatUnits(amount, 6)} USDC tranche.`);
+    score += 1;
+  } else {
+    risks.push(`Campaign needs ${formatUnits(requiredFunding - totalRaised, 6)} more USDC before this tranche is fully funded.`);
+    score -= 2;
+  }
+
+  if (hasEvidence) {
+    checks.push(evidenceURI ? "Creator attached IPFS evidence for contributor review." : "Creator submitted an onchain evidence hash.");
+    score += evidenceURI ? 2 : 1;
+  } else if (evidenceRequired) {
+    risks.push("No milestone evidence is attached yet.");
+    score -= 3;
+  } else {
+    checks.push("First milestone can be treated as upfront funding if contributors accept the campaign plan.");
+  }
+
+  if (creatorReputation) {
+    checks.push(`Creator reputation: ${creatorReputation.label} (${creatorReputation.score}).`);
+    if (creatorReputation.score >= 55) score += 2;
+    else if (creatorReputation.score >= 25) score += 1;
+    else score -= 1;
+
+    if (creatorReputation.failedCampaigns > 0 || creatorReputation.canceledCampaigns > 0) {
+      risks.push("Creator has failed or canceled campaign history.");
+      score -= 2;
+    }
+  } else {
+    risks.push("Creator has no established Fundarc reputation yet.");
+    score -= 1;
+  }
+
+  if (campaignHistory) {
+    if (campaignHistory.externalContributors >= 3) {
+      checks.push(`${campaignHistory.externalContributors} external contributors are recorded for this campaign.`);
+      score += 1;
+    } else {
+      risks.push("External contributor signal is still thin.");
+      score -= 1;
+    }
+
+    if (campaignHistory.selfFundedAmount > campaignHistory.externalRaised && campaignHistory.selfFundedAmount > 0n) {
+      risks.push("Self-funded amount is higher than external funding.");
+      score -= 1;
+    }
+  }
+
+  if (participated > 0n) {
+    const yesShare = formatPercent(yesWeight, participated);
+    checks.push(`Current vote split is ${yesShare} YES by contribution weight.`);
+    if (yesWeight > noWeight) score += 1;
+    if (noWeight > yesWeight) score -= 1;
+  } else if (isVotingLive) {
+    risks.push("Voting is live but no contributor weight has participated yet.");
+  }
+
+  if (!votingConfigured) {
+    nextSteps.push("Wait for the creator to submit this milestone and open voting.");
+  } else if (isVotingLive) {
+    nextSteps.push("Review the evidence link/hash before voting.");
+    nextSteps.push("Vote before the current milestone window closes.");
+  } else if (hasVotingEnded && state === 1) {
+    nextSteps.push("Voting has ended. Anyone can finalize the milestone result.");
+  } else if (state === 4) {
+    nextSteps.push("Milestone is finalized. Review the next pending milestone if one exists.");
+  }
+
+  if (risks.length > 0) {
+    nextSteps.push("Treat this review as a decision aid, not an automatic vote.");
+  }
+
+  if (!votingConfigured || state === 0) {
+    return {
+      recommendation: "Wait",
+      tone: "warn",
+      confidence: Math.min(78, Math.max(35, 52 + score * 6)),
+      summary: "The agent cannot recommend approval until the milestone is submitted and the voting window is open.",
+      checks,
+      risks,
+      nextSteps,
+    };
+  }
+
+  if (score >= 3) {
+    return {
+      recommendation: "Approve",
+      tone: "success",
+      confidence: Math.min(92, 62 + score * 6),
+      summary: "Evidence, funding, and reputation signals are strong enough for a positive contributor review.",
+      checks,
+      risks,
+      nextSteps,
+    };
+  }
+
+  if (score <= -2) {
+    return {
+      recommendation: "Reject",
+      tone: "danger",
+      confidence: Math.min(88, 58 + Math.abs(score) * 6),
+      summary: "The review found material risk in the evidence, funding, or creator history for this milestone.",
+      checks,
+      risks,
+      nextSteps,
+    };
+  }
+
+  return {
+    recommendation: "Wait",
+    tone: "warn",
+    confidence: Math.min(82, Math.max(48, 58 + score * 5)),
+    summary: "Signals are mixed. Contributors should inspect the evidence and wait for stronger participation before deciding.",
+    checks,
+    risks,
+    nextSteps,
+  };
+}
+
+function buildVotingAssistantPlan({
+  agentReview,
+  isConnected,
+  isCreator,
+  myContribution,
+  existingVote,
+  isVotingLive,
+  isCurrentMilestone,
+  secondsLeft,
+}: {
+  agentReview: MilestoneAgentReview;
+  isConnected: boolean;
+  isCreator: boolean;
+  myContribution: bigint;
+  existingVote: number;
+  isVotingLive: boolean;
+  isCurrentMilestone: boolean;
+  secondsLeft: number;
+}): VotingAssistantPlan {
+  const blockers: string[] = [];
+  const reasons: string[] = [];
+
+  if (!isConnected) blockers.push("Connect a wallet to use the voting assistant.");
+  if (!isCurrentMilestone) blockers.push("Only the current milestone can receive votes.");
+  if (!isVotingLive) blockers.push("Voting is not live for this milestone.");
+  if (isCreator) blockers.push("Creators do not receive voting weight on their own campaign.");
+  if (myContribution <= 0n) blockers.push("This wallet has no contribution weight for this campaign.");
+  if (existingVote === 1) blockers.push("This wallet already voted YES on this milestone.");
+  if (existingVote === 2) blockers.push("This wallet already voted NO on this milestone.");
+
+  if (myContribution > 0n) {
+    reasons.push(`Your voting weight is ${formatUnits(myContribution, 6)} USDC.`);
+  }
+
+  if (secondsLeft > 0 && isVotingLive) {
+    reasons.push(`Voting window closes in ${secondsToHuman(secondsLeft)}.`);
+  }
+
+  if (agentReview.recommendation === "Approve") {
+    reasons.push("The milestone review found enough positive evidence to support approval.");
+    return {
+      ready: blockers.length === 0,
+      suggestedSupport: true,
+      label: "Assist Vote YES",
+      summary: "The assistant recommends a YES vote for this milestone.",
+      blockers,
+      reasons,
+    };
+  }
+
+  if (agentReview.recommendation === "Reject") {
+    reasons.push("The milestone review found material risk, so the assistant recommends rejection.");
+    return {
+      ready: blockers.length === 0,
+      suggestedSupport: false,
+      label: "Assist Vote NO",
+      summary: "The assistant recommends a NO vote for this milestone.",
+      blockers,
+      reasons,
+    };
+  }
+
+  reasons.push("The milestone review is not confident enough to pick YES or NO.");
+  return {
+    ready: false,
+    label: "Assistant Waiting",
+    summary: "The assistant recommends waiting until the review signals are clearer.",
+    blockers: blockers.length > 0 ? blockers : ["No assisted vote is available while the recommendation is Wait."],
+    reasons,
+  };
+}
+
 export default function CampaignPageClient({ addr }: { addr: string }) {
   const campaign = addr as `0x${string}`;
 
@@ -209,6 +479,8 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [evidenceUpload, setEvidenceUpload] = useState<EvidenceUploadResponse | null>(null);
   const [withdrawAmt, setWithdrawAmt] = useState("1");
+  const [agentEmail, setAgentEmail] = useState("");
+  const [delegateInput, setDelegateInput] = useState("");
   const [contributors, setContributors] = useState<Contributor[]>([]);
   const [contributorsLoading, setContributorsLoading] = useState(false);
   const [contributorsLoaded, setContributorsLoaded] = useState(false);
@@ -308,6 +580,22 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
     query: { enabled: milestoneCount > 0 },
   });
 
+  const voteChoiceReads = useMemo(
+    () =>
+      Array.from({ length: milestoneCount }, (_, i) => ({
+        abi: fundarcCampaignAbi,
+        address: campaign,
+        functionName: "voteChoice" as const,
+        args: [BigInt(i), address ?? "0x0000000000000000000000000000000000000000"] as const,
+      })),
+    [address, campaign, milestoneCount]
+  );
+
+  const myVoteChoices = useReadContracts({
+    contracts: voteChoiceReads,
+    query: { enabled: !!address && milestoneCount > 0 },
+  });
+
   const totalRequested = useMemo(() => {
     if (!milestones.data) return 0n;
     return milestones.data.reduce((acc, item) => {
@@ -333,6 +621,14 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
     query: { enabled: !!address },
   });
 
+  const currentVoteDelegate = useReadContract({
+    abi: fundarcCampaignAbi,
+    address: campaign,
+    functionName: "voteDelegate",
+    args: [address ?? zeroAddress],
+    query: { enabled: !!address },
+  });
+
   const allowance = useReadContract({
     abi: erc20Abi,
     address: USDC,
@@ -343,6 +639,16 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
 
   const isCreator =
     !!address && !!creator && address.toLowerCase() === creator.toLowerCase();
+  const activeDelegate =
+    typeof currentVoteDelegate.data === "string" && currentVoteDelegate.data !== zeroAddress
+      ? currentVoteDelegate.data
+      : undefined;
+  const activeCampaignHistory = useMemo(() => {
+    if (!creatorReputation.creator) return undefined;
+    return creatorReputation.creator.campaigns.find(
+      (item) => item.address.toLowerCase() === campaign.toLowerCase()
+    );
+  }, [campaign, creatorReputation.creator]);
 
   async function refetchContributors() {
     if (!publicClient) return;
@@ -417,6 +723,8 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
     baseReads.refetch?.();
     milestones.refetch?.();
     evidenceURIs.refetch?.();
+    myVoteChoices.refetch?.();
+    currentVoteDelegate.refetch?.();
     myContrib.refetch?.();
     myRefundable.refetch?.();
     allowance.refetch?.();
@@ -582,6 +890,54 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
     }
   }
 
+  async function setVoteDelegate(delegate: `0x${string}`) {
+    const toastId = toast.loading(delegate === zeroAddress ? "Revoking voting agent..." : "Assigning voting agent...");
+    try {
+      const hash = await writeContractAsync({
+        abi: fundarcCampaignAbi,
+        address: campaign,
+        functionName: "setVoteDelegate",
+        args: [delegate],
+      });
+      await waitForReceipt(hash);
+      if (delegate !== zeroAddress) setDelegateInput("");
+      refetchAll();
+      toast.success(delegate === zeroAddress ? "Voting agent revoked." : "Voting agent assigned.", { id: toastId });
+    } catch (e: any) {
+      console.error(e);
+      toast.error(getErrorMessage(e, "Failed to update voting agent."), { id: toastId });
+    }
+  }
+
+  async function assignVoteDelegate() {
+    if (!address) {
+      toast.error("Connect your wallet first.");
+      return;
+    }
+
+    const nextDelegate = delegateInput.trim();
+    if (!isAddress(nextDelegate)) {
+      toast.error("Enter a valid agent wallet address.");
+      return;
+    }
+
+    if (nextDelegate.toLowerCase() === address.toLowerCase()) {
+      toast.error("Delegate must be a separate agent wallet.");
+      return;
+    }
+
+    await setVoteDelegate(nextDelegate as `0x${string}`);
+  }
+
+  async function copyText(value: string, successMessage: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(successMessage);
+    } catch {
+      toast.error("Copy failed. Select and copy the text manually.");
+    }
+  }
+
   async function finalize(index: number) {
     const toastId = toast.loading(`Finalizing milestone #${index}...`);
     try {
@@ -655,6 +1011,9 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
   const baseLoading = baseReads.isLoading;
   const milestonesLoading = milestones.isLoading;
   const now = Math.floor(Date.now() / 1000);
+  const agentLoginCommand = `circle wallet login --email ${agentEmail.trim() || "<your-email>"}`;
+  const agentCreateCommand = "circle wallet create --blockchain ARC-TESTNET --name fundarc-voting-agent";
+  const agentListCommand = "circle wallet list";
 
   return (
     <main className="page">
@@ -798,6 +1157,139 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
       <section className="card section section-gap">
         <div className="section-head">
           <div className="section-copy">
+            <h2>Agent voting delegation</h2>
+            <div className="subtext">
+              Assign a Circle agent wallet to vote on this campaign using your contribution weight. Funds stay with your wallet.
+            </div>
+          </div>
+          <span className="badge">
+            <WandSparkles size={14} />
+            voteFor enabled
+          </span>
+        </div>
+
+        <div className="delegate-panel">
+          <div className="kv">
+            <div>
+              <div className="k">Current agent wallet</div>
+              <div className="v mono address-line">
+                {activeDelegate ? <ArcNameLabel address={activeDelegate} /> : "No agent assigned"}
+              </div>
+            </div>
+            {activeDelegate ? (
+              <a className="btn btn-sm" href={addrUrl(activeDelegate)} target="_blank" rel="noreferrer">
+                ArcScan <ExternalLink size={16} />
+              </a>
+            ) : null}
+          </div>
+
+          <div className="circle-agent-wizard">
+            <div className="section-head">
+              <div className="section-copy">
+                <h3>Create Circle agent wallet</h3>
+                <div className="subtext">
+                  Use Circle&apos;s Agent Wallet CLI, then paste the created ARC-TESTNET wallet address below.
+                </div>
+              </div>
+              <a
+                className="btn btn-sm"
+                href="https://developers.circle.com/agent-stack/agent-wallets"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Circle docs <ExternalLink size={16} />
+              </a>
+            </div>
+
+            <div className="field">
+              <label>Circle login email</label>
+              <input
+                value={agentEmail}
+                onChange={(event) => setAgentEmail(event.target.value)}
+                placeholder="you@example.com"
+              />
+            </div>
+
+            <div className="agent-command-grid">
+              <div className="command-card">
+                <div className="k">1. Login</div>
+                <code>{agentLoginCommand}</code>
+                <button
+                  className="btn btn-sm"
+                  type="button"
+                  onClick={() => void copyText(agentLoginCommand, "Login command copied.")}
+                >
+                  Copy
+                </button>
+              </div>
+              <div className="command-card">
+                <div className="k">2. Create wallet</div>
+                <code>{agentCreateCommand}</code>
+                <button
+                  className="btn btn-sm"
+                  type="button"
+                  onClick={() => void copyText(agentCreateCommand, "Create command copied.")}
+                >
+                  Copy
+                </button>
+              </div>
+              <div className="command-card">
+                <div className="k">3. Find address</div>
+                <code>{agentListCommand}</code>
+                <button
+                  className="btn btn-sm"
+                  type="button"
+                  onClick={() => void copyText(agentListCommand, "List command copied.")}
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="row align-end section-gap">
+            <div className="field" style={{ flex: 1, minWidth: 260 }}>
+              <label>Agent wallet address</label>
+              <input
+                value={delegateInput}
+                onChange={(event) => setDelegateInput(event.target.value)}
+                placeholder="0x... Circle agent wallet"
+              />
+              <div className="fineprint">
+                The agent can only call delegated vote functions for this campaign. It cannot withdraw your funds.
+              </div>
+            </div>
+            <div className="actions">
+              <button
+                className="btn btn-primary btn-lg"
+                onClick={assignVoteDelegate}
+                disabled={isPending || !address}
+                type="button"
+              >
+                <WandSparkles size={18} />
+                Assign agent
+              </button>
+              <button
+                className="btn btn-lg"
+                onClick={() => void setVoteDelegate(zeroAddress)}
+                disabled={isPending || !address || !activeDelegate}
+                type="button"
+              >
+                Revoke
+              </button>
+            </div>
+          </div>
+
+          <div className="status-card section-gap">
+            Agent execution call: <span className="mono">voteFor({address ? `${address.slice(0, 10)}...` : "funder"}, milestoneIndex, support)</span>.
+            The campaign records the vote against your contributor address, so double-vote protection still applies.
+          </div>
+        </div>
+      </section>
+
+      <section className="card section section-gap">
+        <div className="section-head">
+          <div className="section-copy">
             <h2>Contributors</h2>
             <div className="subtext">Wallets that have funded this campaign. Load on demand to avoid slow RPC scans.</div>
           </div>
@@ -875,6 +1367,12 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
               const state = asNumber(m.state);
               const yesWeight = asBigint(m.yesWeight);
               const noWeight = asBigint(m.noWeight);
+              const myVoteChoice = asNumber(
+                myVoteChoices.data?.[idx]?.status === "success"
+                  ? myVoteChoices.data[idx].result
+                  : 0
+              );
+              const myContribution = (myContrib.data ?? 0n) as bigint;
 
               const votingConfigured = voteStart > 0n && voteEnd > 0n;
               const isVotingLive =
@@ -896,6 +1394,32 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
                 typeof evidenceURIs.data[idx].result === "string"
                   ? evidenceURIs.data[idx].result
                   : "";
+              const agentReview = buildMilestoneAgentReview({
+                index: idx,
+                amount,
+                state,
+                evidenceHash: m.evidenceHash,
+                evidenceURI,
+                voteStart,
+                voteEnd,
+                yesWeight,
+                noWeight,
+                now,
+                totalRaised,
+                requiredFunding,
+                creatorReputation: creatorReputation.creator,
+                campaignHistory: activeCampaignHistory,
+              });
+              const votingAssistant = buildVotingAssistantPlan({
+                agentReview,
+                isConnected: !!address,
+                isCreator,
+                myContribution,
+                existingVote: myVoteChoice,
+                isVotingLive,
+                isCurrentMilestone,
+                secondsLeft,
+              });
 
               let statusText = "Voting not started.";
               if (!votingConfigured) {
@@ -945,7 +1469,7 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
                       ) : null}
 
                       <div className="subtext" style={{ marginTop: 6 }}>
-                        state={state} • voteStart={voteStart.toString()} • voteEnd={voteEnd.toString()}
+                        state={milestoneStateName(state)} • voteStart={voteStart.toString()} • voteEnd={voteEnd.toString()}
                       </div>
 
                       {evidenceURI ? (
@@ -962,6 +1486,107 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
                       <div className="subtext">Votes</div>
                       <div className="subtext" style={{ marginTop: 8 }}>
                         yes: {formatUnits(yesWeight, 6)} • no: {formatUnits(noWeight, 6)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={`agent-review agent-review-${agentReview.tone}`}>
+                    <div className="agent-review-head">
+                      <div className="section-copy">
+                        <span className="badge">
+                          <Bot size={14} />
+                          Milestone Review Agent
+                        </span>
+                        <h3>{agentReview.summary}</h3>
+                      </div>
+                      <span
+                        className={`badge ${
+                          agentReview.tone === "success"
+                            ? "badge-success"
+                            : agentReview.tone === "warn"
+                              ? "badge-warn"
+                              : "badge-danger"
+                        }`}
+                      >
+                        <ShieldCheck size={14} />
+                        {agentReview.recommendation} • {agentReview.confidence}% confidence
+                      </span>
+                    </div>
+
+                    <div className="agent-review-grid">
+                      <div>
+                        <div className="k">Positive checks</div>
+                        <ul>
+                          {agentReview.checks.length > 0 ? (
+                            agentReview.checks.map((check) => <li key={check}>{check}</li>)
+                          ) : (
+                            <li>No positive checks yet.</li>
+                          )}
+                        </ul>
+                      </div>
+                      <div>
+                        <div className="k">Risk flags</div>
+                        <ul>
+                          {agentReview.risks.length > 0 ? (
+                            agentReview.risks.map((risk) => <li key={risk}>{risk}</li>)
+                          ) : (
+                            <li>No major risk flags detected.</li>
+                          )}
+                        </ul>
+                      </div>
+                      <div>
+                        <div className="k">Suggested next steps</div>
+                        <ul>
+                          {agentReview.nextSteps.map((step) => <li key={step}>{step}</li>)}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="voting-assistant">
+                    <div className="agent-review-head">
+                      <div className="section-copy">
+                        <span className="badge">
+                          <WandSparkles size={14} />
+                          Contributor Voting Assistant
+                        </span>
+                        <h3>{votingAssistant.summary}</h3>
+                        <div className="subtext">
+                          This helper never votes automatically. It prepares the suggested vote and your wallet still confirms the transaction.
+                        </div>
+                      </div>
+                      <button
+                        className={`btn btn-lg ${votingAssistant.suggestedSupport === false ? "btn-no" : "btn-yes"}`}
+                        onClick={() => {
+                          if (votingAssistant.suggestedSupport !== undefined) {
+                            void vote(idx, votingAssistant.suggestedSupport);
+                          }
+                        }}
+                        disabled={isPending || !votingAssistant.ready}
+                        title={votingAssistant.blockers[0] ?? "Submit the assistant's suggested vote."}
+                        type="button"
+                      >
+                        {votingAssistant.suggestedSupport === false ? <ThumbsDown size={18} /> : <ThumbsUp size={18} />}
+                        {votingAssistant.label}
+                      </button>
+                    </div>
+
+                    <div className="assistant-grid">
+                      <div>
+                        <div className="k">Why this vote</div>
+                        <ul>
+                          {votingAssistant.reasons.map((reason) => <li key={reason}>{reason}</li>)}
+                        </ul>
+                      </div>
+                      <div>
+                        <div className="k">Wallet checks</div>
+                        <ul>
+                          {votingAssistant.blockers.length > 0 ? (
+                            votingAssistant.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)
+                          ) : (
+                            <li>Ready to submit with this wallet.</li>
+                          )}
+                        </ul>
                       </div>
                     </div>
                   </div>

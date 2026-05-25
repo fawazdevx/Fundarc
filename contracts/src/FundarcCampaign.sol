@@ -54,6 +54,7 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
     event MilestoneSubmitted(uint256 indexed index, bytes32 evidenceHash, uint40 voteStart, uint40 voteEnd);
     event MilestoneEvidenceURIUpdated(uint256 indexed index, string evidenceURI);
     event Voted(address indexed funder, uint256 indexed index, bool support, uint256 weight);
+    event VoteDelegateUpdated(address indexed funder, address indexed delegate);
     event MilestoneFinalized(uint256 indexed index, bool approved);
     event Withdrawn(address indexed creator, uint256 amount);
     event FeePaid(address indexed factory, uint256 feeAmount);
@@ -81,6 +82,7 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
     mapping(uint256 => string) public milestoneEvidenceURI;
 
     mapping(uint256 => mapping(address => uint8)) public voteChoice;
+    mapping(address => address) public voteDelegate;
 
     uint40 public votingPeriod;
     uint16 public quorumBps;
@@ -100,6 +102,10 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
     modifier inState(CampaignState s) {
         require(campaignState == s, "BAD_CAMPAIGN_STATE");
         _;
+    }
+
+    constructor() {
+        _disableInitializers();
     }
 
     function initialize(
@@ -251,23 +257,39 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
         emit MilestoneSubmitted(currentMilestone, evidenceHash, start, end);
     }
 
+    function setVoteDelegate(address delegate) external inState(CampaignState.Active) {
+        require(delegate != msg.sender, "SELF_DELEGATE");
+        voteDelegate[msg.sender] = delegate;
+        emit VoteDelegateUpdated(msg.sender, delegate);
+    }
+
     function vote(uint256 milestoneIndex, bool support) external nonReentrant inState(CampaignState.Active) {
+        _voteFor(msg.sender, milestoneIndex, support);
+    }
+
+    function voteFor(address funder, uint256 milestoneIndex, bool support) external nonReentrant inState(CampaignState.Active) {
+        require(funder != address(0), "BAD_FUNDER");
+        require(voteDelegate[funder] == msg.sender, "NOT_DELEGATE");
+        _voteFor(funder, milestoneIndex, support);
+    }
+
+    function _voteFor(address funder, uint256 milestoneIndex, bool support) internal {
         require(milestoneIndex == currentMilestone, "NOT_CURRENT");
 
         Milestone storage m = milestones[milestoneIndex];
         require(m.state == MilestoneState.Voting, "NOT_VOTING");
         require(block.timestamp >= m.voteStart && block.timestamp < m.voteEnd, "VOTE_CLOSED");
-        require(voteChoice[milestoneIndex][msg.sender] == 0, "ALREADY_VOTED");
+        require(voteChoice[milestoneIndex][funder] == 0, "ALREADY_VOTED");
 
-        uint256 weight = msg.sender == creator ? 0 : contributed[msg.sender];
+        uint256 weight = funder == creator ? 0 : contributed[funder];
         require(weight > 0, "NO_WEIGHT");
 
-        voteChoice[milestoneIndex][msg.sender] = support ? 1 : 2;
+        voteChoice[milestoneIndex][funder] = support ? 1 : 2;
 
         if (support) m.yesWeight += uint128(weight);
         else m.noWeight += uint128(weight);
 
-        emit Voted(msg.sender, milestoneIndex, support, weight);
+        emit Voted(funder, milestoneIndex, support, weight);
     }
 
     function finalizeMilestone(uint256 milestoneIndex) external nonReentrant inState(CampaignState.Active) {

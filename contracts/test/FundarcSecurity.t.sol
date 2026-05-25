@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {FundarcCampaign} from "../src/FundarcCampaign.sol";
 import {FundarcFactory} from "../src/FundarcFactory.sol";
+import {ERC1967Proxy} from "openzeppelin-contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract MockUSDC {
     string public constant name = "Mock USDC";
@@ -54,8 +55,10 @@ contract FundarcSecurityTest is Test {
     function setUp() external {
         usdc = new MockUSDC();
         FundarcCampaign campaignImpl = new FundarcCampaign();
-        factory = new FundarcFactory();
-        factory.initialize(owner, address(usdc), address(campaignImpl), 100, treasury);
+        FundarcFactory factoryImpl = new FundarcFactory();
+        bytes memory initData =
+            abi.encodeCall(FundarcFactory.initialize, (owner, address(usdc), address(campaignImpl), 100, treasury));
+        factory = FundarcFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
 
         usdc.mint(creator, 1_000 * USDC);
         usdc.mint(funder1, 1_000 * USDC);
@@ -71,6 +74,32 @@ contract FundarcSecurityTest is Test {
         vm.prank(creator);
         vm.expectRevert("GOAL_TOO_LOW");
         factory.createCampaign("Tiny", "Too small", milestones, 1 days, 2_000, 6_000);
+    }
+
+    function testFactoryImplementationCannotBeInitializedDirectly() external {
+        FundarcFactory factoryImpl = new FundarcFactory();
+        FundarcCampaign campaignImpl = new FundarcCampaign();
+
+        vm.expectRevert();
+        factoryImpl.initialize(owner, address(usdc), address(campaignImpl), 100, treasury);
+    }
+
+    function testCampaignImplementationCannotBeInitializedDirectly() external {
+        FundarcCampaign campaignImpl = new FundarcCampaign();
+
+        vm.expectRevert();
+        campaignImpl.initialize(
+            creator,
+            address(usdc),
+            address(factory),
+            "Locked implementation",
+            "Cannot initialize directly",
+            _milestones(100 * USDC),
+            1 days,
+            2_000,
+            6_000,
+            1 days
+        );
     }
 
     function testCreateCampaignRejectsTooManyMilestones() external {
@@ -284,6 +313,76 @@ contract FundarcSecurityTest is Test {
         assertEq(factory.activeCampaignByCreator(creator), address(0));
         assertEq(campaign.externalRaised(), 100 * USDC);
         assertEq(campaign.externalContributors(), 1);
+    }
+
+    function testDelegateCanVoteForContributor() external {
+        address delegate = address(0xD16E);
+
+        vm.prank(creator);
+        address campaignAddress =
+            factory.createCampaign("Delegate", "Delegate voting", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+        FundarcCampaign campaign = FundarcCampaign(campaignAddress);
+
+        vm.startPrank(funder1);
+        usdc.approve(campaignAddress, 100 * USDC);
+        campaign.contribute(100 * USDC);
+        campaign.setVoteDelegate(delegate);
+        vm.stopPrank();
+
+        vm.prank(creator);
+        campaign.submitMilestone(bytes32("evidence"));
+
+        vm.prank(delegate);
+        campaign.voteFor(funder1, 0, true);
+
+        assertEq(campaign.voteChoice(0, funder1), 1);
+    }
+
+    function testDelegateVoteRejectsUnauthorizedCaller() external {
+        address delegate = address(0xD16E);
+
+        vm.prank(creator);
+        address campaignAddress =
+            factory.createCampaign("Delegate", "Delegate voting", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+        FundarcCampaign campaign = FundarcCampaign(campaignAddress);
+
+        vm.startPrank(funder1);
+        usdc.approve(campaignAddress, 100 * USDC);
+        campaign.contribute(100 * USDC);
+        campaign.setVoteDelegate(delegate);
+        vm.stopPrank();
+
+        vm.prank(creator);
+        campaign.submitMilestone(bytes32("evidence"));
+
+        vm.prank(funder2);
+        vm.expectRevert("NOT_DELEGATE");
+        campaign.voteFor(funder1, 0, true);
+    }
+
+    function testDelegateVoteStillBlocksDoubleVoting() external {
+        address delegate = address(0xD16E);
+
+        vm.prank(creator);
+        address campaignAddress =
+            factory.createCampaign("Delegate", "Delegate voting", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+        FundarcCampaign campaign = FundarcCampaign(campaignAddress);
+
+        vm.startPrank(funder1);
+        usdc.approve(campaignAddress, 100 * USDC);
+        campaign.contribute(100 * USDC);
+        campaign.setVoteDelegate(delegate);
+        vm.stopPrank();
+
+        vm.prank(creator);
+        campaign.submitMilestone(bytes32("evidence"));
+
+        vm.prank(delegate);
+        campaign.voteFor(funder1, 0, true);
+
+        vm.prank(funder1);
+        vm.expectRevert("ALREADY_VOTED");
+        campaign.vote(0, false);
     }
 
     function _milestones(uint256 amount) internal pure returns (uint96[] memory milestones) {

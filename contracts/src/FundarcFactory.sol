@@ -51,6 +51,10 @@ contract FundarcFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable, R
     uint40 public defaultFundingPeriod;
     mapping(address => address) public activeCampaignByCreator;
 
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address _owner,
         address _usdc,
