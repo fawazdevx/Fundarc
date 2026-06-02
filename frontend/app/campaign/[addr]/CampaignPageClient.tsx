@@ -12,6 +12,7 @@ import {
   usePublicClient,
   useReadContract,
   useReadContracts,
+  useSignMessage,
   useWriteContract,
 } from "wagmi";
 import { fundarcCampaignAbi } from "@/src/abi/campaign";
@@ -176,6 +177,15 @@ type EvidenceUploadResponse = {
   type: string;
 };
 
+type AgentWalletResponse = {
+  walletId: string;
+  address: `0x${string}`;
+  blockchain: string;
+  state?: string;
+  name?: string;
+  refId?: string;
+};
+
 type MilestoneAgentReview = {
   recommendation: "Approve" | "Reject" | "Wait";
   tone: "success" | "warn" | "danger";
@@ -218,6 +228,25 @@ function isBytes32Hex(value: string) {
 function ipfsUrl(uri: string) {
   if (!uri.startsWith("ipfs://")) return uri;
   return `https://gateway.pinata.cloud/ipfs/${uri.replace("ipfs://", "")}`;
+}
+
+function agentWalletMessage(contributor: string, campaign: string, timestamp: number) {
+  return [
+    "Fundarc Circle agent wallet creation",
+    `Contributor: ${contributor.toLowerCase()}`,
+    `Campaign: ${campaign.toLowerCase()}`,
+    `Timestamp: ${timestamp}`,
+  ].join("\n");
+}
+
+function agentVoteMessage(contributor: string, campaign: string, agentWallet: string, timestamp: number) {
+  return [
+    "Fundarc agent automated vote",
+    `Contributor: ${contributor.toLowerCase()}`,
+    `Campaign: ${campaign.toLowerCase()}`,
+    `Agent: ${agentWallet.toLowerCase()}`,
+    `Timestamp: ${timestamp}`,
+  ].join("\n");
 }
 
 function milestoneStateName(state: number) {
@@ -473,13 +502,16 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync, isPending } = useWriteContract();
+  const { signMessageAsync } = useSignMessage();
 
   const [contribution, setContribution] = useState("10");
   const [evidenceHash, setEvidenceHash] = useState<string>(zeroHash);
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [evidenceUpload, setEvidenceUpload] = useState<EvidenceUploadResponse | null>(null);
   const [withdrawAmt, setWithdrawAmt] = useState("1");
-  const [agentEmail, setAgentEmail] = useState("");
+  const [agentWallet, setAgentWallet] = useState<AgentWalletResponse | null>(null);
+  const [agentCreating, setAgentCreating] = useState(false);
+  const [agentVotingIndex, setAgentVotingIndex] = useState<number | null>(null);
   const [delegateInput, setDelegateInput] = useState("");
   const [contributors, setContributors] = useState<Contributor[]>([]);
   const [contributorsLoading, setContributorsLoading] = useState(false);
@@ -929,6 +961,105 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
     await setVoteDelegate(nextDelegate as `0x${string}`);
   }
 
+  async function createCircleAgentWallet() {
+    if (!address) {
+      toast.error("Connect your wallet first.");
+      return;
+    }
+
+    setAgentCreating(true);
+    const toastId = toast.loading("Creating Circle agent wallet...");
+
+    try {
+      toast.loading("Confirm wallet ownership...", { id: toastId });
+      const timestamp = Date.now();
+      const signature = await signMessageAsync({
+        message: agentWalletMessage(address, campaign, timestamp),
+      });
+
+      toast.loading("Creating Circle agent wallet...", { id: toastId });
+      const response = await fetch("/api/agents/create-wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contributor: address,
+          campaign,
+          timestamp,
+          signature,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        toast.error(payload?.error ?? "Failed to create Circle agent wallet.", { id: toastId });
+        return;
+      }
+
+      const wallet = payload as AgentWalletResponse;
+      setAgentWallet(wallet);
+      setDelegateInput(wallet.address);
+      toast.success("Circle agent wallet created. Address filled below.", { id: toastId });
+    } catch (e: any) {
+      console.error(e);
+      toast.error(getErrorMessage(e, "Failed to create Circle agent wallet."), { id: toastId });
+    } finally {
+      setAgentCreating(false);
+    }
+  }
+
+  async function runAgentAutomation(index: number) {
+    if (!address) {
+      toast.error("Connect your wallet first.");
+      return;
+    }
+
+    if (!activeDelegate) {
+      toast.error("Assign an agent wallet first.");
+      return;
+    }
+
+    setAgentVotingIndex(index);
+    const toastId = toast.loading("Confirm agent vote request...");
+
+    try {
+      const timestamp = Date.now();
+      const signature = await signMessageAsync({
+        message: agentVoteMessage(address, campaign, activeDelegate, timestamp),
+      });
+
+      toast.loading("Agent is reviewing and voting...", { id: toastId });
+      const response = await fetch("/api/agents/auto-vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contributor: address,
+          campaign,
+          agentWallet: activeDelegate,
+          timestamp,
+          signature,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        toast.error(payload?.error ?? "Agent vote failed.", { id: toastId });
+        return;
+      }
+
+      refetchAll();
+      if (payload?.action === "WAIT") {
+        toast.success(payload?.reason ?? "Agent decided to wait.", { id: toastId });
+      } else {
+        toast.success(`Agent submitted ${payload?.support ? "YES" : "NO"} vote.`, { id: toastId });
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error(getErrorMessage(e, "Agent vote failed."), { id: toastId });
+    } finally {
+      setAgentVotingIndex(null);
+    }
+  }
+
   async function copyText(value: string, successMessage: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -1011,9 +1142,6 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
   const baseLoading = baseReads.isLoading;
   const milestonesLoading = milestones.isLoading;
   const now = Math.floor(Date.now() / 1000);
-  const agentLoginCommand = `circle wallet login --email ${agentEmail.trim() || "<your-email>"}`;
-  const agentCreateCommand = "circle wallet create --blockchain ARC-TESTNET --name fundarc-voting-agent";
-  const agentListCommand = "circle wallet list";
 
   return (
     <main className="page">
@@ -1188,63 +1316,51 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
               <div className="section-copy">
                 <h3>Create Circle agent wallet</h3>
                 <div className="subtext">
-                  Use Circle&apos;s Agent Wallet CLI, then paste the created ARC-TESTNET wallet address below.
+                  Create an ARC-TESTNET agent wallet from Fundarc. The address is filled below for delegation.
                 </div>
               </div>
-              <a
-                className="btn btn-sm"
-                href="https://developers.circle.com/agent-stack/agent-wallets"
-                target="_blank"
-                rel="noreferrer"
+              <button
+                className="btn btn-primary btn-lg"
+                type="button"
+                onClick={createCircleAgentWallet}
+                disabled={!address || agentCreating}
               >
-                Circle docs <ExternalLink size={16} />
-              </a>
+                <WandSparkles size={18} />
+                {agentCreating ? "Creating..." : "Create agent wallet"}
+              </button>
             </div>
 
-            <div className="field">
-              <label>Circle login email</label>
-              <input
-                value={agentEmail}
-                onChange={(event) => setAgentEmail(event.target.value)}
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <div className="agent-command-grid">
-              <div className="command-card">
-                <div className="k">1. Login</div>
-                <code>{agentLoginCommand}</code>
-                <button
-                  className="btn btn-sm"
-                  type="button"
-                  onClick={() => void copyText(agentLoginCommand, "Login command copied.")}
-                >
-                  Copy
-                </button>
+            {agentWallet ? (
+              <div className="agent-wallet-result">
+                <div>
+                  <div className="k">Created wallet</div>
+                  <div className="v mono address-line">{agentWallet.address}</div>
+                  <div className="fineprint">
+                    {agentWallet.blockchain} {agentWallet.state ? `• ${agentWallet.state}` : ""}
+                  </div>
+                </div>
+                <div className="actions">
+                  <button
+                    className="btn btn-sm"
+                    type="button"
+                    onClick={() => void copyText(agentWallet.address, "Agent wallet address copied.")}
+                  >
+                    Copy address
+                  </button>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    type="button"
+                    onClick={() => setDelegateInput(agentWallet.address)}
+                  >
+                    Use as delegate
+                  </button>
+                </div>
               </div>
-              <div className="command-card">
-                <div className="k">2. Create wallet</div>
-                <code>{agentCreateCommand}</code>
-                <button
-                  className="btn btn-sm"
-                  type="button"
-                  onClick={() => void copyText(agentCreateCommand, "Create command copied.")}
-                >
-                  Copy
-                </button>
+            ) : (
+              <div className="fineprint">
+                Requires server env vars: CIRCLE_API_KEY, CIRCLE_ENTITY_SECRET, and CIRCLE_WALLET_SET_ID.
               </div>
-              <div className="command-card">
-                <div className="k">3. Find address</div>
-                <code>{agentListCommand}</code>
-                <button
-                  className="btn btn-sm"
-                  type="button"
-                  onClick={() => void copyText(agentListCommand, "List command copied.")}
-                >
-                  Copy
-                </button>
-              </div>
-            </div>
+            )}
           </div>
 
           <div className="row align-end section-gap">
@@ -1278,11 +1394,6 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
                 Revoke
               </button>
             </div>
-          </div>
-
-          <div className="status-card section-gap">
-            Agent execution call: <span className="mono">voteFor({address ? `${address.slice(0, 10)}...` : "funder"}, milestoneIndex, support)</span>.
-            The campaign records the vote against your contributor address, so double-vote protection still applies.
           </div>
         </div>
       </section>
@@ -1552,23 +1663,42 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
                         </span>
                         <h3>{votingAssistant.summary}</h3>
                         <div className="subtext">
-                          This helper never votes automatically. It prepares the suggested vote and your wallet still confirms the transaction.
+                          Submit manually from your wallet, or let the delegated Circle agent wallet submit the reviewed vote.
                         </div>
                       </div>
-                      <button
-                        className={`btn btn-lg ${votingAssistant.suggestedSupport === false ? "btn-no" : "btn-yes"}`}
-                        onClick={() => {
-                          if (votingAssistant.suggestedSupport !== undefined) {
-                            void vote(idx, votingAssistant.suggestedSupport);
+                      <div className="actions">
+                        <button
+                          className={`btn btn-lg ${votingAssistant.suggestedSupport === false ? "btn-no" : "btn-yes"}`}
+                          onClick={() => {
+                            if (votingAssistant.suggestedSupport !== undefined) {
+                              void vote(idx, votingAssistant.suggestedSupport);
+                            }
+                          }}
+                          disabled={isPending || !votingAssistant.ready}
+                          title={votingAssistant.blockers[0] ?? "Submit the assistant's suggested vote."}
+                          type="button"
+                        >
+                          {votingAssistant.suggestedSupport === false ? <ThumbsDown size={18} /> : <ThumbsUp size={18} />}
+                          {votingAssistant.label}
+                        </button>
+                        <button
+                          className="btn btn-primary btn-lg"
+                          onClick={() => void runAgentAutomation(idx)}
+                          disabled={
+                            isPending ||
+                            agentVotingIndex !== null ||
+                            !activeDelegate ||
+                            !isCurrentMilestone ||
+                            !isVotingLive ||
+                            myVoteChoice !== 0
                           }
-                        }}
-                        disabled={isPending || !votingAssistant.ready}
-                        title={votingAssistant.blockers[0] ?? "Submit the assistant's suggested vote."}
-                        type="button"
-                      >
-                        {votingAssistant.suggestedSupport === false ? <ThumbsDown size={18} /> : <ThumbsUp size={18} />}
-                        {votingAssistant.label}
-                      </button>
+                          title={!activeDelegate ? "Assign an agent wallet first." : "Run delegated Circle agent vote."}
+                          type="button"
+                        >
+                          <WandSparkles size={18} />
+                          {agentVotingIndex === idx ? "Agent voting..." : "Agent vote now"}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="assistant-grid">
