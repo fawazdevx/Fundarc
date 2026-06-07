@@ -256,6 +256,193 @@ select {
   padding: 116px 32px 68px;
 }
 
+.landing-section {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 72px 0;
+}
+
+.landing-section + .landing-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.landing-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.landing-section-head h2,
+.landing-agent-copy h2 {
+  margin-top: 8px;
+  color: var(--text);
+  font-size: clamp(28px, 4vw, 48px);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+
+.section-eyebrow {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.landing-campaign-grid,
+.landing-step-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.landing-campaign-card,
+.landing-step-card,
+.landing-empty-card,
+.landing-agent-section,
+.landing-agent-panel {
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.024)),
+    rgba(11, 14, 21, 0.68);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.landing-campaign-card,
+.landing-step-card,
+.landing-empty-card {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  min-height: 220px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+}
+
+.landing-campaign-card h3,
+.landing-step-card h3 {
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.landing-campaign-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.landing-campaign-meta span {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.landing-campaign-meta strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.landing-empty-card {
+  grid-column: 1 / -1;
+  min-height: 150px;
+  place-items: center;
+  text-align: center;
+  color: var(--muted);
+}
+
+.landing-empty-card svg {
+  color: var(--accent);
+}
+
+.landing-step-card span,
+.agent-orbit-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-md);
+  background: rgba(45, 212, 191, 0.14);
+  color: var(--accent);
+}
+
+.landing-step-card p,
+.landing-agent-copy p {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.landing-agent-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
+  gap: 28px;
+  align-items: center;
+  margin-bottom: 72px;
+  padding: clamp(24px, 4vw, 42px);
+  border-radius: var(--radius-xl);
+}
+
+.landing-agent-copy {
+  display: grid;
+  gap: 16px;
+}
+
+.landing-agent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.landing-agent-panel {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(145deg, rgba(45, 212, 191, 0.12), rgba(167, 139, 250, 0.08)),
+    rgba(11, 14, 21, 0.76);
+}
+
+.agent-orbit-icon {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 6px;
+  border-radius: 999px;
+  box-shadow: 0 0 30px rgba(45, 212, 191, 0.18);
+}
+
+.landing-agent-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.landing-agent-row svg {
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+
 .landing-banner-wash {
   object-fit: cover;
   opacity: 0.13;
@@ -1006,9 +1193,74 @@ select {
   align-items: flex-start;
 }
 
-.create-shell {
-  width: min(100%, 860px);
-  margin: 0 auto;
+.create-hero {
+  min-height: 136px;
+}
+
+.create-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  gap: 16px;
+  align-items: start;
+}
+
+.create-side {
+  position: sticky;
+  top: 92px;
+  display: grid;
+  gap: 14px;
+}
+
+.create-summary-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.create-summary-panel h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.create-summary-list {
+  display: grid;
+  gap: 10px;
+}
+
+.create-summary-item,
+.create-rule-list div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.create-summary-item:last-child,
+.create-rule-list div:last-child {
+  border-bottom: 0;
+}
+
+.create-summary-item span,
+.create-rule-list span {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.create-summary-item strong,
+.create-rule-list strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 14px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.create-rule-list {
+  display: grid;
 }
 
 .discover-shell {
@@ -1755,14 +2007,30 @@ a.btn-primary:hover {
   .grid-3,
   .agent-review-grid,
   .assistant-grid,
+  .create-workspace,
   .form-grid,
   .reputation-metrics,
   .stats-grid {
     grid-template-columns: 1fr;
   }
 
+  .create-side {
+    position: static;
+  }
+
   .reputation-metrics.compact {
     grid-template-columns: 1fr;
+  }
+
+  .landing-campaign-grid,
+  .landing-step-grid,
+  .landing-agent-section {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-section-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .landing-hero {
@@ -1801,6 +2069,21 @@ a.btn-primary:hover {
   .wallet-slot {
     width: 100%;
     flex-wrap: wrap;
+  }
+
+  .landing-section {
+    width: min(100% - 24px, 1180px);
+    padding: 46px 0;
+  }
+
+  .landing-agent-section {
+    margin-bottom: 46px;
+    padding: 18px;
+  }
+
+  .landing-campaign-card,
+  .landing-step-card {
+    min-height: auto;
   }
 
   .agent-wallet-result {

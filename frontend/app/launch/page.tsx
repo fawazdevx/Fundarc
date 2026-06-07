@@ -93,6 +93,8 @@ export default function LaunchPage() {
       return 0n;
     }
   }, [milestones]);
+  const milestoneCount = milestones.map((s) => s.trim()).filter(Boolean).length;
+  const creationFee = (campaignCreationFee.data ?? 0n) as bigint;
 
   async function create() {
     if (CAMPAIGN_CREATION_MAINTENANCE || campaignCreationPaused.data === true) {
@@ -189,7 +191,7 @@ export default function LaunchPage() {
 
   return (
     <main className="page">
-      <section className="card hero">
+      <section className="card hero create-hero">
         <div className="row spread">
           <div>
             <h1 className="hero-title">Create campaign</h1>
@@ -218,7 +220,7 @@ export default function LaunchPage() {
         </div>
       </section>
 
-      <div className="create-shell section-gap">
+      <div className="create-workspace section-gap">
         <section className="card section">
           {isCreationPaused ? (
             <div className="maintenance-panel">
@@ -367,6 +369,63 @@ export default function LaunchPage() {
             </>
           )}
         </section>
+
+        <aside className="create-side">
+          <section className="panel create-summary-panel">
+            <div className="section-copy">
+              <h2>Campaign setup</h2>
+              <div className="subtext">Review the funding shape before creating the campaign.</div>
+            </div>
+
+            <div className="create-summary-list">
+              <div className="create-summary-item">
+                <span>Total requested</span>
+                <strong>{formatUnits(milestoneTotal, 6)} USDC</strong>
+              </div>
+              <div className="create-summary-item">
+                <span>Minimum goal</span>
+                <strong>{MIN_RECOMMENDED_CAMPAIGN_USDC} USDC</strong>
+              </div>
+              <div className="create-summary-item">
+                <span>Milestones</span>
+                <strong>
+                  {milestoneCount}/{MAX_MILESTONES}
+                </strong>
+              </div>
+              <div className="create-summary-item">
+                <span>Category</span>
+                <strong>{createCategory}</strong>
+              </div>
+              <div className="create-summary-item">
+                <span>Voting period</span>
+                <strong>{votingPeriodHours} hours</strong>
+              </div>
+              <div className="create-summary-item">
+                <span>Creation fee</span>
+                <strong>{formatUnits(creationFee, 6)} USDC</strong>
+              </div>
+            </div>
+          </section>
+
+          <section className="panel create-summary-panel">
+            <div className="section-copy">
+              <h2>Unlock rules</h2>
+            </div>
+            <div className="create-rule-list">
+              <div>
+                <span>Quorum</span>
+                <strong>{(quorumBps / 100).toLocaleString()}%</strong>
+              </div>
+              <div>
+                <span>Pass threshold</span>
+                <strong>{(passBps / 100).toLocaleString()}%</strong>
+              </div>
+            </div>
+            <div className="fineprint">
+              Contributors review submitted milestone evidence and vote before each tranche can unlock.
+            </div>
+          </section>
+        </aside>
       </div>
     </main>
   );
