@@ -1006,6 +1006,118 @@ select {
   align-items: flex-start;
 }
 
+.create-shell {
+  width: min(100%, 860px);
+  margin: 0 auto;
+}
+
+.discover-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.campaign-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+
+.campaign-discovery-card {
+  display: flex;
+  min-width: 0;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: var(--shadow-soft);
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease), transform 0.2s var(--ease);
+}
+
+.campaign-discovery-card:hover {
+  border-color: rgba(45, 212, 191, 0.3);
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-1px);
+}
+
+.campaign-card-top {
+  display: grid;
+  gap: 10px;
+}
+
+.campaign-card-title {
+  min-width: 0;
+}
+
+.campaign-card-title h2 {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: clamp(18px, 2vw, 22px);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.campaign-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.campaign-progress {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.campaign-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+
+.campaign-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.campaign-card-stats div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.campaign-card-stats span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.campaign-card-stats strong {
+  display: block;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.campaign-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+}
+
 .campaign-description {
   display: -webkit-box;
   max-width: 680px;
@@ -1036,6 +1148,11 @@ select {
 @media (min-width: 980px) {
   .discovery-controls {
     grid-template-columns: minmax(0, 1fr) minmax(0, 150px) minmax(0, 140px);
+  }
+
+  .campaign-card-top {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
   }
 }
 

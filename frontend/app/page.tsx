@@ -11,6 +11,7 @@ import {
   ArrowRight,
   BarChart3,
   CircleDollarSign,
+  Compass,
   LockKeyhole,
   ShieldCheck,
   Sparkles,
@@ -119,8 +120,12 @@ export default function LandingPage() {
           <div className="landing-actions">
             <Link className="btn btn-primary btn-lg" href="/launch">
               <WalletCards size={18} />
-              Launch dApp
+              Create campaign
               <ArrowRight size={18} />
+            </Link>
+            <Link className="btn btn-lg" href="/discover">
+              <Compass size={18} />
+              Explore campaigns
             </Link>
             <Link className="btn btn-lg" href="/dashboard">
               <BarChart3 size={18} />

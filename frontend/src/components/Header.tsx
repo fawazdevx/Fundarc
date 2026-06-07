@@ -8,7 +8,7 @@ import Link from "next/link";
 import { ConnectButton, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useDisconnect } from "wagmi";
 import { useANSReverse } from "@arcnames/sdk-react";
-import { BarChart3, ChevronDown, LogOut, Rocket } from "lucide-react";
+import { BarChart3, ChevronDown, Compass, LogOut, Rocket } from "lucide-react";
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -136,7 +136,11 @@ export function Header() {
         <div className="wallet-slot">
           <Link className="btn btn-sm" href="/launch">
             <Rocket size={16} />
-            Launch dApp
+            Create
+          </Link>
+          <Link className="btn btn-sm" href="/discover">
+            <Compass size={16} />
+            Discover
           </Link>
           <Link className="btn btn-sm" href="/dashboard">
             <BarChart3 size={16} />
