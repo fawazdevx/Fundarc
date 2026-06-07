@@ -1316,7 +1316,7 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
               <div className="section-copy">
                 <h3>Create Circle agent wallet</h3>
                 <div className="subtext">
-                  Create an ARC-TESTNET agent wallet from Fundarc. The address is filled below for delegation.
+                  Create a secure agent wallet for automated milestone voting. You can review the address before assigning it.
                 </div>
               </div>
               <button
@@ -1358,7 +1358,7 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
               </div>
             ) : (
               <div className="fineprint">
-                Requires server env vars: CIRCLE_API_KEY, CIRCLE_ENTITY_SECRET, and CIRCLE_WALLET_SET_ID.
+                Your agent wallet address will appear here after creation.
               </div>
             )}
           </div>
