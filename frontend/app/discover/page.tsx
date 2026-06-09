@@ -242,10 +242,14 @@ export default function DiscoverPage() {
 
     return campaignCards
       .filter((campaign) => {
+        const isCanceled = campaign.state === 1;
+        const isFailed = campaign.state === 2;
+        const isSuccessful = campaign.state === 3;
         const isBelowVisibleGoal =
           !campaign.requestedResolved || campaign.requested < MIN_VISIBLE_CAMPAIGN_USDC;
         const isCompleted =
-          campaign.requestedResolved && campaign.requested > 0n && campaign.totalWithdrawn >= campaign.requested;
+          isSuccessful ||
+          (campaign.requestedResolved && campaign.requested > 0n && campaign.totalWithdrawn >= campaign.requested);
         const matchesQuery =
           !q ||
           campaign.title.toLowerCase().includes(q) ||
@@ -254,7 +258,7 @@ export default function DiscoverPage() {
           campaign.creator?.toLowerCase().includes(q);
         const matchesCategory = category === "All" || campaign.category === category;
 
-        return !isBelowVisibleGoal && (showCompleted || !isCompleted) && matchesQuery && matchesCategory;
+        return !isCanceled && !isFailed && !isBelowVisibleGoal && (showCompleted || !isCompleted) && matchesQuery && matchesCategory;
       })
       .sort((a, b) => {
         if (sortMode === "newest") return b.createdAt - a.createdAt;
@@ -359,9 +363,10 @@ export default function DiscoverPage() {
           <div className="campaign-card-grid">
             {visibleCampaigns.map((campaign) => {
               const isCompleted =
-                campaign.requestedResolved &&
-                campaign.requested > 0n &&
-                campaign.totalWithdrawn >= campaign.requested;
+                campaign.state === 3 ||
+                (campaign.requestedResolved &&
+                  campaign.requested > 0n &&
+                  campaign.totalWithdrawn >= campaign.requested);
               const progressPct =
                 campaign.requested > 0n
                   ? Math.min(100, Number((campaign.totalRaised * 100n) / campaign.requested))

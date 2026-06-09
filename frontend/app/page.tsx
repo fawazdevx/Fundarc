@@ -60,9 +60,9 @@ function shortAddress(address?: string) {
 
 function campaignStateLabel(state: number) {
   if (state === 0) return "Active";
-  if (state === 1) return "Successful";
+  if (state === 1) return "Canceled";
   if (state === 2) return "Failed";
-  if (state === 3) return "Cancelled";
+  if (state === 3) return "Successful";
   return "Campaign";
 }
 
@@ -124,30 +124,32 @@ export default function LandingPage() {
   const campaignPreviews = useMemo(() => {
     if (!previewMetaResults.data) return [];
 
-    return previewAddresses.map((addr, index): CampaignPreview => {
-      const offset = index * CAMPAIGN_PREVIEW_READS;
-      return {
-        addr,
-        title:
-          previewMetaResults.data[offset]?.status === "success" &&
-          typeof previewMetaResults.data[offset].result === "string"
-            ? (previewMetaResults.data[offset].result as string)
-            : "Fundarc campaign",
-        creator:
-          previewMetaResults.data[offset + 1]?.status === "success" &&
-          typeof previewMetaResults.data[offset + 1].result === "string"
-            ? (previewMetaResults.data[offset + 1].result as `0x${string}`)
-            : undefined,
-        totalRaised:
-          previewMetaResults.data[offset + 2]?.status === "success"
-            ? (previewMetaResults.data[offset + 2].result as bigint)
-            : 0n,
-        state:
-          previewMetaResults.data[offset + 3]?.status === "success"
-            ? Number(previewMetaResults.data[offset + 3].result ?? 0n)
-            : 0,
-      };
-    });
+    return previewAddresses
+      .map((addr, index): CampaignPreview => {
+        const offset = index * CAMPAIGN_PREVIEW_READS;
+        return {
+          addr,
+          title:
+            previewMetaResults.data[offset]?.status === "success" &&
+            typeof previewMetaResults.data[offset].result === "string"
+              ? (previewMetaResults.data[offset].result as string)
+              : "Fundarc campaign",
+          creator:
+            previewMetaResults.data[offset + 1]?.status === "success" &&
+            typeof previewMetaResults.data[offset + 1].result === "string"
+              ? (previewMetaResults.data[offset + 1].result as `0x${string}`)
+              : undefined,
+          totalRaised:
+            previewMetaResults.data[offset + 2]?.status === "success"
+              ? (previewMetaResults.data[offset + 2].result as bigint)
+              : 0n,
+          state:
+            previewMetaResults.data[offset + 3]?.status === "success"
+              ? Number(previewMetaResults.data[offset + 3].result ?? 0n)
+              : 0,
+        };
+      })
+      .filter((campaign) => campaign.state !== 1 && campaign.state !== 2);
   }, [previewAddresses, previewMetaResults.data]);
 
   return (
