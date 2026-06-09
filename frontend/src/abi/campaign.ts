@@ -65,6 +65,7 @@ export const fundarcCampaignAbi = [
   },
 
   { type: "function", name: "contribute", stateMutability: "nonpayable", inputs: [{ name: "amount", type: "uint256" }], outputs: [] },
+  { type: "function", name: "cancel", stateMutability: "nonpayable", inputs: [], outputs: [] },
   { type: "function", name: "setVoteDelegate", stateMutability: "nonpayable", inputs: [{ name: "delegate", type: "address" }], outputs: [] },
 
   { type: "function", name: "submitMilestone", stateMutability: "nonpayable", inputs: [{ name: "evidenceHash", type: "bytes32" }], outputs: [] },

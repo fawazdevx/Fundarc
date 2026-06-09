@@ -172,6 +172,35 @@ contract FundarcSecurityTest is Test {
         assertEq(factory.activeCampaignByCreator(creator), nextCampaign);
     }
 
+    function testCreatorCannotCancelFundedCampaign() external {
+        vm.prank(creator);
+        address campaignAddress =
+            factory.createCampaign("Funded", "Cannot cancel after funds arrive", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+        FundarcCampaign campaign = FundarcCampaign(campaignAddress);
+
+        vm.startPrank(funder1);
+        usdc.approve(campaignAddress, 10 * USDC);
+        campaign.contribute(10 * USDC);
+        vm.stopPrank();
+
+        vm.prank(creator);
+        vm.expectRevert("CAMPAIGN_FUNDED");
+        campaign.cancel();
+
+        assertEq(uint256(campaign.campaignState()), uint256(FundarcCampaign.CampaignState.Active));
+        assertEq(factory.activeCampaignByCreator(creator), campaignAddress);
+    }
+
+    function testNonCreatorCannotCancelEmptyCampaign() external {
+        vm.prank(creator);
+        address campaignAddress =
+            factory.createCampaign("Empty", "Only creator can cancel", _milestones(100 * USDC), 1 days, 2_000, 6_000);
+
+        vm.prank(funder1);
+        vm.expectRevert("NOT_CREATOR");
+        FundarcCampaign(campaignAddress).cancel();
+    }
+
     function testCreatorCanCreateAfterCampaignSuccessful() external {
         vm.prank(creator);
         address campaignAddress =

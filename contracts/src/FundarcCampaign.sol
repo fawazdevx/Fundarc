@@ -217,7 +217,7 @@ contract FundarcCampaign is Initializable, ReentrancyGuardUpgradeable, OwnableUp
     }
 
     function cancel() external onlyCreator inState(CampaignState.Active) {
-        require(totalWithdrawn == 0, "ALREADY_WITHDRAWN");
+        require(totalRaised == 0, "CAMPAIGN_FUNDED");
         campaignState = CampaignState.Canceled;
         _clearCreatorActiveCampaign();
         emit Canceled();

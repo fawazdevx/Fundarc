@@ -1370,6 +1370,17 @@ select {
   margin-top: auto;
 }
 
+.cancel-campaign-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid rgba(251, 113, 133, 0.22);
+  border-radius: var(--radius-md);
+  background: rgba(251, 113, 133, 0.07);
+}
+
 .campaign-description {
   display: -webkit-box;
   max-width: 680px;
@@ -2079,6 +2090,11 @@ a.btn-primary:hover {
   .landing-agent-section {
     margin-bottom: 46px;
     padding: 18px;
+  }
+
+  .cancel-campaign-panel {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .landing-campaign-card,

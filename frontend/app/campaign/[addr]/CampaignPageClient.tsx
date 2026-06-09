@@ -671,6 +671,7 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
 
   const isCreator =
     !!address && !!creator && address.toLowerCase() === creator.toLowerCase();
+  const canCancelEmptyCampaign = isCreator && campaignState === 0 && totalRaised === 0n;
   const activeDelegate =
     typeof currentVoteDelegate.data === "string" && currentVoteDelegate.data !== zeroAddress
       ? currentVoteDelegate.data
@@ -1087,6 +1088,32 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
     }
   }
 
+  async function cancelCampaign() {
+    if (!canCancelEmptyCampaign) {
+      toast.error(totalRaised > 0n ? "Funded campaigns cannot be canceled by the creator." : "Campaign cannot be canceled.");
+      return;
+    }
+
+    const confirmed = window.confirm("Cancel this empty campaign? This clears your active campaign slot.");
+    if (!confirmed) return;
+
+    const toastId = toast.loading("Canceling campaign...");
+    try {
+      const hash = await writeContractAsync({
+        abi: fundarcCampaignAbi,
+        address: campaign,
+        functionName: "cancel",
+        args: [],
+      });
+      await waitForReceipt(hash);
+      refetchAll();
+      toast.success("Campaign canceled.", { id: toastId });
+    } catch (e: any) {
+      console.error(e);
+      toast.error(getErrorMessage(e, "Failed to cancel campaign."), { id: toastId });
+    }
+  }
+
   async function withdraw() {
     let amt: bigint;
     try {
@@ -1236,6 +1263,28 @@ export default function CampaignPageClient({ addr }: { addr: string }) {
               </div>
             </div>
           </div>
+
+          {isCreator && campaignState === 0 ? (
+            <div className="cancel-campaign-panel section-gap">
+              <div className="section-copy">
+                <h3>Creator controls</h3>
+                <div className="subtext">
+                  Empty campaigns can be canceled before any USDC is contributed. Funded campaigns must continue
+                  through milestone voting or refunds.
+                </div>
+              </div>
+              <button
+                className="btn btn-no"
+                type="button"
+                onClick={() => void cancelCampaign()}
+                disabled={isPending || !canCancelEmptyCampaign}
+                title={!canCancelEmptyCampaign ? "This campaign has already received funding." : "Cancel this empty campaign."}
+              >
+                <Flag size={16} />
+                Cancel empty campaign
+              </button>
+            </div>
+          ) : null}
         </section>
 
         <section className="card section">
