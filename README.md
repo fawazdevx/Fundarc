@@ -1,143 +1,273 @@
 # Fundarc
 
-![Demo](frontend/public/brand/fundarc-banner.svg)
+![Fundarc banner](frontend/public/brand/fundarc-banner.svg)
 
-Fundarc is a stablecoin-native crowdfunding dApp built for Arc Testnet. It lets creators raise USDC through milestone-based campaigns, while funders keep governance power over when each tranche of funds is unlocked.
+Fundarc is a **USDC-native programmable milestone funding protocol on Arc Testnet**. It helps builders, creators, open-source projects, public goods teams, and online communities raise funds transparently while contributors retain approval rights over when creator funds unlock.
 
-Instead of releasing all funds at once, Fundarc splits a campaign into milestones. Contributors fund the campaign with USDC, creators submit milestone evidence, contributors vote with contribution-weighted voting power, and only approved milestones unlock funds for the creator. If a campaign is canceled or fails a milestone vote, funders can claim refunds.
+Instead of releasing all funding upfront, Fundarc splits campaigns into milestones. Contributors fund campaigns with USDC, creators submit milestone evidence, and contributors vote with contribution-weighted governance before each tranche can be withdrawn.
 
-Built fully onchain using upgradeable contracts, minimal proxies, and USDC-based funding logic.
+Fundarc also integrates Circle-powered agent wallet flows so contributors can delegate milestone voting to an agent wallet when they are unavailable during voting windows.
 
-Deployed on Arc Testnet with real contract interactions and live campaign flows.
+## Links
 
+- App: https://fundarc.netlify.app
+- GitHub: https://github.com/fawazdevx/Fundarc
+- Investor / grant deck source: [docs/fundarc-investor-deck.md](docs/fundarc-investor-deck.md)
 
-## Try Fundarc
+## Why Fundarc
 
-A milestone-based crowdfunding protocol where funds unlock only after contributor approval.
+Traditional crowdfunding still depends heavily on centralized trust, manual enforcement, and offchain moderation. Contributors often fund promises upfront with limited visibility into delivery, weak refund paths, and little influence after contributing.
 
+Fundarc turns funding into an onchain milestone workflow:
 
-Live on Arc Testnet.
+- Creators define milestones before fundraising.
+- Contributors fund with USDC.
+- Funds remain escrowed in campaign contracts.
+- Creators submit evidence for each milestone.
+- Contributors vote to approve or reject fund release.
+- Approved milestones unlock creator withdrawals.
+- Failed or canceled campaigns preserve refund paths.
+- Creator reputation builds from public campaign history.
+- Agent wallets can help contributors vote when they are unavailable.
 
-👉 App: https://fundarc.netlify.app  
-👉 Demo (2–3 min): https://x.com/0xFawazdev/status/2051664921880916010
+## Current Status
 
-Test it in minutes:
-1. Connect wallet
-2. Create or fund a campaign
-3. Vote on a milestone
+Fundarc is live as a working Arc Testnet application with deployed smart contracts and an active frontend.
 
+Implemented product flows:
 
-## Table of Contents
+- Campaign creation
+- Campaign discovery
+- USDC contributions
+- Milestone escrow
+- IPFS milestone evidence uploads
+- Contribution-weighted milestone voting
+- Creator withdrawals after approval
+- Refund claims for failed or canceled campaigns
+- Creator reputation profiles
+- Contributor lists
+- Dashboard metrics
+- Circle agent wallet creation inside Fundarc
+- Vote delegation to agent wallets
+- Automated milestone voting through delegated agent wallets
+- Empty campaign cancellation by creators
+- Canceled/failed campaign filtering in discovery
 
-- [Overview](#overview)
-- [Core Features](#core-features)
-- [How Fundarc Works](#how-fundarc-works)
-- [Project Structure](#project-structure)
-- [Tech Stack](#tech-stack)
-- [Smart Contracts](#smart-contracts)
-- [Frontend](#frontend)
-- [Environment Variables](#environment-variables)
-- [Local Development](#local-development)
-- [Contract Development](#contract-development)
-- [Contract Deployment](#contract-deployment)
-- [Key User Flows](#key-user-flows)
-- [Roadmap](#roadmap-ideas)
-- [License](#license)
+## Circle and Arc Alignment
 
-## Overview
+Fundarc is built around USDC-native funding coordination on Arc.
 
-Fundarc is designed for transparent, accountable project funding. It is useful for open-source grants, creator campaigns, community initiatives, public goods, hackathon projects, and any funding process where contributors should have visibility and control over fund release.
+### Current Circle / Arc Usage
 
-The protocol has two major parts:
+- **USDC funding**: Campaign contributions, escrowed balances, refunds, withdrawals, and protocol fees use USDC-denominated flows.
+- **Arc Testnet**: Contracts are deployed on Arc Testnet and the frontend is configured for Arc-based interactions.
+- **Circle agent wallets**: Contributors can create an agent wallet from inside Fundarc.
+- **Delegated voting**: Contributors can assign an agent wallet to vote on a campaign using their contribution weight.
+- **Automated voting**: The app includes an automated milestone voting flow where the delegated agent wallet can review context and submit a vote during an active voting window.
 
-1. **Smart contracts** in `contracts/`
-   - `FundarcFactory` deploys campaign contracts and manages protocol fees.
-   - `FundarcCampaign` holds USDC, tracks contributions, manages milestone voting, unlocks funds, and processes refunds.
+### Planned Circle Integrations
 
-2. **Frontend application** in `frontend/`
-   - A Next.js app for creating campaigns, contributing USDC, voting on milestones, withdrawing unlocked funds, claiming refunds, and viewing protocol metrics.
+- Circle Paymaster for smoother gas abstraction.
+- Expanded Circle Wallet UX for onboarding and agent management.
+- Circle Gateway and/or CCTP exploration for future crosschain USDC funding.
+- More robust agentic payment and automation workflows for campaign governance.
 
-## Core Features
+## Deployed Contracts
 
-- **USDC-based crowdfunding**
-  Campaigns accept ERC-20 USDC contributions instead of volatile native-token funding.
+Arc Testnet:
 
-- **Milestone funding**
-  Creators define one or more milestone amounts during campaign creation.
+| Contract | Address |
+| --- | --- |
+| Factory Proxy | `0x6D7FFE972726134B880b43B3866fF97e72ac7792` |
+| FundarcCampaign Implementation | `0x2210f569946251a00809DAF95FCe2656CadA296d` |
+| FundarcFactory Implementation | `0x222f72a92785Fa6B0f4730284F49D042234fFCE8` |
+| Owner / Deployer | `0xB3aae9496a6670d13e1b80B1Fb3ad445c635aC23` |
 
-- **Contribution-weighted voting**
-  Contributors vote on milestone approval using the amount they contributed as voting weight.
+Arc Testnet reference:
 
-- **Creator evidence submission**
-  The campaign creator submits a `bytes32` evidence hash before milestone voting starts.
+- Chain ID: `5042002`
+- Explorer: https://testnet.arcscan.app
+- Faucet: https://faucet.circle.com
+- ERC-20 USDC on Arc Testnet: `0x3600000000000000000000000000000000000000`
 
-- **Refund safety**
-  If a campaign is canceled before withdrawals or fails a milestone vote, contributors can claim refunds.
-
-- **Protocol fees**
-  A configurable fee is taken when creators withdraw unlocked funds.
-
-- **Upgradeable factory**
-  The factory is deployed behind an ERC-1967 proxy using the UUPS upgrade pattern.
-
-- **Minimal proxy campaigns**
-  New campaigns are created as OpenZeppelin clones of the campaign implementation, reducing deployment cost.
-
-- **Arc Testnet wallet support**
-  The frontend uses RainbowKit, wagmi, and viem to connect wallets to Arc Testnet.
-
-- **Dashboard analytics**
-  The dashboard reads factory and campaign events to show campaign creation and revenue metrics over 7-day or 30-day windows.
-
-## How Fundarc Works
-
-1. A creator opens the app and creates a campaign.
-2. The creator enters a title, description, milestone amounts, voting period, quorum threshold, and pass threshold.
-3. The factory deploys a new `FundarcCampaign` clone.
-4. Funders approve USDC and contribute to the campaign.
-5. The creator submits milestone evidence, which opens a voting window.
-6. Contributors vote yes or no.
-7. After the voting period ends, anyone can finalize the milestone.
-8. If the vote passes, that milestone amount becomes withdrawable by the creator.
-9. If the vote fails, the campaign becomes failed and contributors can claim refunds.
-10. When the creator withdraws unlocked funds, the protocol fee is sent to the configured fee treasury.
-
-## Project Structure
+## Architecture
 
 ```text
 Fundarc/
-|-- README.md
 |-- contracts/
-|   |-- foundry.toml
+|   |-- src/
+|   |   |-- FundarcFactory.sol
+|   |   |-- FundarcCampaign.sol
+|   |   `-- interfaces/
+|   |       `-- IERC20Minimal.sol
 |   |-- script/
 |   |   |-- Deploy.s.sol
-|   |   |-- UpgradeFee.s.sol
-|   |   `-- UpgradeFactoryFeeEvent.s.sol
-|   `-- src/
-|       |-- FundarcCampaign.sol
-|       |-- FundarcFactory.sol
-|       `-- interfaces/
-|           `-- IERC20Minimal.sol
-`-- frontend/
-    |-- app/
-    |   |-- page.tsx
-    |   |-- dashboard/
-    |   |   `-- page.tsx
-    |   `-- campaign/
-    |       `-- [addr]/
-    |           |-- page.tsx
-    |           `-- CampaignPageClient.tsx
-    |-- lib/
-    |   `-- wagmi.ts
-    |-- src/
-    |   |-- abi/
-    |   |   |-- campaign.ts
-    |   |   |-- erc20.ts
-    |   |   `-- factory.ts
-    |   `-- components/
-    |       `-- Header.tsx
-    `-- package.json
+|   |   |-- SetCampaignImplementation.s.sol
+|   |   |-- UpgradeFactoryAndCampaign.s.sol
+|   |   `-- ...
+|   `-- test/
+|       `-- FundarcSecurity.t.sol
+|-- frontend/
+|   |-- app/
+|   |   |-- page.tsx
+|   |   |-- launch/
+|   |   |-- discover/
+|   |   |-- dashboard/
+|   |   |-- creator/
+|   |   |-- campaign/
+|   |   `-- api/
+|   |       |-- agents/
+|   |       `-- evidence/
+|   |-- src/
+|   |   |-- abi/
+|   |   |-- components/
+|   |   |-- config/
+|   |   |-- hooks/
+|   |   `-- server/
+|   `-- package.json
+|-- docs/
+|   `-- fundarc-investor-deck.md
+`-- README.md
 ```
+
+## Smart Contracts
+
+### `FundarcFactory`
+
+The factory is the protocol-level contract used to create campaigns and manage factory configuration.
+
+Responsibilities:
+
+- Stores the USDC token address.
+- Stores the current campaign implementation.
+- Deploys campaign clones.
+- Tracks all created campaigns.
+- Tracks one active campaign per creator.
+- Enforces campaign creation fee and minimum goal rules.
+- Supports campaign creation pause controls.
+- Lets the owner update the campaign implementation for future campaigns.
+- Clears creator active campaign slots when campaigns complete, fail, or are canceled.
+
+### `FundarcCampaign`
+
+Each campaign contract holds funds and enforces the campaign lifecycle.
+
+Responsibilities:
+
+- Accepts USDC contributions.
+- Tracks contributor balances and vote weight.
+- Tracks milestones and milestone states.
+- Stores IPFS evidence URIs for milestone submissions.
+- Opens voting windows after creator evidence submission.
+- Supports direct contributor voting.
+- Supports delegated voting through `voteFor`.
+- Finalizes milestone results.
+- Unlocks approved milestone funds.
+- Handles creator withdrawals.
+- Handles contributor refunds.
+- Allows creator cancellation only while the campaign has received zero funding.
+
+Campaign states:
+
+- `Active`
+- `Canceled`
+- `Failed`
+- `Successful`
+
+Milestone states:
+
+- `PendingSubmission`
+- `Voting`
+- `Approved`
+- `Rejected`
+- `Finalized`
+
+## Product Features
+
+### Campaign Creation
+
+Creators can launch campaigns with:
+
+- Title and description
+- Category
+- One or more USDC milestones
+- Voting duration
+- Quorum threshold
+- Pass threshold
+
+Campaign creation includes safeguards such as a minimum campaign goal, maximum milestone count, active campaign limits per creator, and optional factory-level creation pause.
+
+### Campaign Discovery
+
+The discovery page provides:
+
+- Search by campaign, creator, or address
+- Category filters
+- Sorting by trending, newest, or highest goal
+- Responsive campaign cards
+- Automatic hiding of canceled and failed campaigns
+- Optional display for completed campaigns
+
+### Contributions
+
+Contributors approve and fund campaigns with USDC. Contribution amounts determine voting weight. Creator self-funding is tracked separately and does not create voting weight for the creator.
+
+### Milestone Evidence
+
+Creators can submit milestone evidence with:
+
+- Onchain evidence hash
+- IPFS media/file upload through the frontend evidence route
+- Evidence URI display on campaign milestone cards
+
+### Contributor Voting
+
+Contributors can vote yes or no on the current milestone during the voting window. Voting is contribution-weighted and double voting is blocked.
+
+### Circle Agent Wallet Delegation
+
+Contributors can:
+
+- Create a Circle agent wallet inside Fundarc.
+- Copy or auto-fill the agent wallet address.
+- Assign the agent wallet as their campaign voting delegate.
+- Revoke the delegate.
+- Let the delegated agent wallet submit a milestone vote through `voteFor`.
+
+The delegated agent can vote for the contributor, but it cannot withdraw contributor funds.
+
+### Creator Reputation
+
+Fundarc computes creator reputation from public campaign history, including:
+
+- Active campaigns
+- Completed campaigns
+- Failed campaigns
+- Canceled campaigns
+- Approved milestones
+- Rejected milestones
+- External contributors
+- Self-funded amount vs external funding
+
+### Refund and Cancellation Safety
+
+Refunds are available when campaigns fail or are canceled.
+
+Creators can cancel an empty campaign only if no USDC has been contributed. Once a campaign receives funding, the creator cannot unilaterally cancel it; the campaign must proceed through milestone voting and refund-aware lifecycle rules.
+
+## Frontend Routes
+
+| Route | Purpose |
+| --- | --- |
+| `/` | Landing page with project overview and live campaign previews |
+| `/launch` | Focused campaign creation flow |
+| `/discover` | Campaign discovery and filtering |
+| `/campaign/[addr]` | Campaign detail, contributions, milestones, voting, delegation, refunds, withdrawals |
+| `/creator/[address]` | Creator reputation profile |
+| `/dashboard` | Protocol metrics and analytics |
+| `/api/agents/create-wallet` | Server route for Circle agent wallet creation |
+| `/api/agents/auto-vote` | Server route for automated delegated voting |
+| `/api/evidence` | Server route for evidence uploads |
 
 ## Tech Stack
 
@@ -156,7 +286,6 @@ Fundarc/
 - Next.js
 - React
 - TypeScript
-- Tailwind CSS
 - wagmi
 - viem
 - RainbowKit
@@ -164,427 +293,200 @@ Fundarc/
 - Recharts
 - lucide-react
 - react-hot-toast
-- Netlify Next.js plugin
+- Netlify
 
-## Smart Contracts
+### Integrations
 
-### `FundarcFactory`
+- Arc Testnet
+- USDC
+- Circle wallet / agent wallet infrastructure
+- IPFS evidence upload flow
 
-`FundarcFactory` is the protocol-level contract responsible for creating campaigns and managing fee configuration.
+## Security and Testing
 
-Main responsibilities:
+Fundarc includes Foundry tests covering key protocol behavior.
 
-- Stores the USDC token address.
-- Stores the current campaign implementation address.
-- Deploys campaign clones through `Clones.clone`.
-- Tracks all deployed campaign addresses.
-- Stores the protocol fee in basis points.
-- Stores the fee treasury address.
-- Collects protocol fees from campaign withdrawals.
-- Supports owner-authorized UUPS upgrades.
+Current covered areas include:
 
-Important functions:
+- Factory and campaign implementation initializer protection
+- Minimum campaign goal enforcement
+- Campaign creation pause
+- Creation fee accounting
+- Active campaign guard per creator
+- Creator can create after cancel/success
+- Creator cannot cancel funded campaigns
+- Non-creator cannot cancel campaigns
+- Funding deadline enforcement
+- Minimum contribution enforcement
+- Milestone evidence URI storage
+- Milestone submission funding requirement
+- Creator self-funding does not create voting weight
+- External funding counts for quorum
+- Delegated voting authorization
+- Delegated voting double-vote protection
 
-- `initialize(...)`
-  Initializes the factory proxy with owner, USDC, campaign implementation, fee settings, and treasury.
+Run tests:
 
-- `createCampaign(...)`
-  Creates a new campaign clone with title, description, milestone amounts, voting period, quorum, and pass threshold.
-
-- `campaignsCount()`
-  Returns the number of campaigns created by the factory.
-
-- `campaigns(uint256)`
-  Returns a campaign address by index.
-
-- `setCampaignImplementation(address)`
-  Lets the owner update the implementation used for future campaign clones.
-
-- `setFeeConfig(uint16,address)`
-  Lets the owner update protocol fee settings.
-
-- `takeFee(uint256)`
-  Pulls the fee amount from a campaign and sends it to the fee treasury.
-
-### `FundarcCampaign`
-
-`FundarcCampaign` is the per-campaign contract that holds USDC and manages the campaign lifecycle.
-
-Main responsibilities:
-
-- Accepts USDC contributions.
-- Tracks contributor balances.
-- Stores campaign title and description.
-- Stores milestones and milestone state.
-- Opens voting windows after creator milestone submission.
-- Records contribution-weighted votes.
-- Finalizes milestone vote results.
-- Unlocks funds for approved milestones.
-- Allows creator withdrawals from unlocked funds.
-- Allows refunds when campaigns are canceled or failed.
-
-Campaign states:
-
-- `Active`
-- `Canceled`
-- `Failed`
-- `Successful`
-
-Milestone states:
-
-- `PendingSubmission`
-- `Voting`
-- `Approved`
-- `Rejected`
-- `Finalized`
-
-Important functions:
-
-- `contribute(uint256 amount)`
-  Transfers USDC from the funder to the campaign.
-
-- `cancel()`
-  Lets the creator cancel an active campaign if no funds have been withdrawn.
-
-- `submitMilestone(bytes32 evidenceHash)`
-  Lets the creator submit milestone evidence and start the voting period.
-
-- `vote(uint256 milestoneIndex, bool support)`
-  Lets contributors vote yes or no on the current milestone.
-
-- `finalizeMilestone(uint256 milestoneIndex)`
-  Finalizes the vote after the voting window ends.
-
-- `withdrawUnlocked(uint256 amount)`
-  Lets the creator withdraw approved funds, minus protocol fee.
-
-- `claimRefund()`
-  Lets contributors claim refunds if the campaign is canceled or failed.
-
-## Frontend
-
-The frontend is a Next.js app located in `frontend/`.
-
-Main routes:
-
-- `/`
-  Home page for creating campaigns and browsing existing campaigns.
-
-- `/campaign/[addr]`
-  Campaign detail page for contributing, voting, submitting milestones, withdrawing funds, and claiming refunds.
-
-- `/dashboard`
-  Protocol metrics page that reads on-chain events and displays campaign/revenue charts.
-
-Frontend capabilities:
-
-- Connect wallet with RainbowKit.
-- Read factory configuration and protocol revenue.
-- Create new campaigns through the factory.
-- Browse deployed campaigns.
-- View campaign funding totals.
-- Approve USDC and contribute.
-- View milestone amounts, voting windows, and vote totals.
-- Submit milestone evidence as the creator.
-- Vote yes/no as a contributor.
-- Finalize ended votes.
-- Withdraw unlocked creator funds.
-- Claim refunds when eligible.
-- Link factory, campaign, creator, and treasury addresses to the configured block explorer.
-
-## Environment Variables
-
-### Frontend
-
-Create `frontend/.env.local`:
-
-```env
-NEXT_PUBLIC_CHAIN_ID=
-NEXT_PUBLIC_ARC_RPC_URL=
-NEXT_PUBLIC_EXPLORER=
-NEXT_PUBLIC_FACTORY_ADDRESS=
-NEXT_PUBLIC_USDC_ADDRESS=
-NEXT_PUBLIC_WC_PROJECT_ID=
+```bash
+cd contracts
+forge test
 ```
-
-Variable descriptions:
-
-- `NEXT_PUBLIC_CHAIN_ID`
-  Arc Testnet chain ID.
-
-- `NEXT_PUBLIC_ARC_RPC_URL`
-  RPC endpoint used by wagmi and the dashboard event reader.
-
-- `NEXT_PUBLIC_EXPLORER`
-  Base block explorer URL. The app builds address links from this value.
-
-- `NEXT_PUBLIC_FACTORY_ADDRESS`
-  Deployed `FundarcFactory` proxy address.
-
-- `NEXT_PUBLIC_USDC_ADDRESS`
-  ERC-20 USDC token address used by campaigns.
-
-- `NEXT_PUBLIC_WC_PROJECT_ID`
-  WalletConnect project ID required by RainbowKit.
-
-### Contracts
-
-Create `contracts/.env`:
-
-```env
-PRIVATE_KEY=
-RPC_URL=
-USDC_ADDRESS=
-OWNER=
-FEE_BPS=
-FEE_TREASURY=
-```
-
-Variable descriptions:
-
-- `PRIVATE_KEY`
-  Deployment wallet private key.
-
-- `RPC_URL`
-  Arc Testnet RPC URL.
-
-- `USDC_ADDRESS`
-  USDC token address used by the protocol.
-
-- `OWNER`
-  Owner address for the upgradeable factory.
-
-- `FEE_BPS`
-  Protocol fee in basis points. Example: `100` means `1%`.
-
-- `FEE_TREASURY`
-  Address that receives protocol fees.
 
 ## Local Development
 
-### 1. Clone or open the project
+### Prerequisites
 
-```bash
-cd /home/fawazdev/dapp-projects/Fundarc
-```
+- Node.js
+- npm
+- Foundry
+- Wallet funded with Arc Testnet USDC from https://faucet.circle.com
+- WalletConnect project ID for frontend wallet connection
 
-### 2. Install frontend dependencies
+### Frontend Setup
 
 ```bash
 cd frontend
 npm install
 ```
 
-### 3. Configure frontend environment
+Create `frontend/.env.local`:
 
-Create `frontend/.env.local` and fill in the required values listed above.
+```env
+NEXT_PUBLIC_CHAIN_ID=5042002
+NEXT_PUBLIC_ARC_RPC_URL=https://rpc.testnet.arc.network
+NEXT_PUBLIC_EXPLORER=https://testnet.arcscan.app
+NEXT_PUBLIC_FACTORY_ADDRESS=0x6D7FFE972726134B880b43B3866fF97e72ac7792
+NEXT_PUBLIC_USDC_ADDRESS=0x3600000000000000000000000000000000000000
+NEXT_PUBLIC_WC_PROJECT_ID=
 
-### 4. Start the frontend
+# Server-only Circle variables. Do not expose these with NEXT_PUBLIC_.
+CIRCLE_API_KEY=
+CIRCLE_ENTITY_SECRET=
+CIRCLE_WALLET_SET_ID=
+```
+
+Run the frontend:
 
 ```bash
 npm run dev
 ```
 
-The app should run locally at:
-
-```text
-http://localhost:3000
-```
-
-If port `3000` is already in use, Next.js will offer another port.
-
-### 5. Build the frontend
+Build the frontend:
 
 ```bash
 npm run build
 ```
 
-### 6. Start the production build
-
-```bash
-npm run start
-```
-
-## Contract Development
-
-From the contracts folder:
+### Contract Setup
 
 ```bash
 cd contracts
 forge build
-```
-
-Run tests when test files are added:
-
-```bash
 forge test
 ```
 
-Format Solidity files:
+Example Arc Testnet deployment command:
 
 ```bash
-forge fmt
-```
-
-## Contract Deployment
-
-The deploy script is located at:
-
-```text
-contracts/script/Deploy.s.sol
-```
-
-It deploys:
-
-1. `FundarcCampaign` implementation
-2. `FundarcFactory` implementation
-3. `ERC1967Proxy` initialized as the factory proxy
-
-Example deployment command:
-
-```bash
-cd contracts
-source .env
 forge script script/Deploy.s.sol:Deploy \
   --rpc-url "$ARC_RPC_URL" \
   --chain-id "$ARC_CHAIN_ID" \
-  --account "deploytestKey" \
-  --sender "WALLET_ADDRESS" \
-  --broadcast -vvv
+  --account deploytestKey \
+  --sender "$OWNER" \
+  --broadcast \
+  -vvv
 ```
 
-After deployment, copy the printed `FactoryProxy` address into:
+Update the campaign implementation used for future campaign clones:
 
-```env
-NEXT_PUBLIC_FACTORY_ADDRESS=
+```bash
+forge script script/SetCampaignImplementation.s.sol:SetCampaignImplementation \
+  --rpc-url "$ARC_RPC_URL" \
+  --chain-id "$ARC_CHAIN_ID" \
+  --account deploytestKey \
+  --sender "$OWNER" \
+  --broadcast \
+  -vvv
 ```
 
-The deployment script prints:
+## Demo Walkthrough for Reviewers
 
-- `CampaignImplementation`
-- `FactoryProxy`
-- `FactoryImplementation`
+Recommended review flow:
 
-Use the proxy address as the public factory address in the frontend.
-
-## Key User Flows
-
-### Create a Campaign
-
-1. Connect a wallet.
-2. Enter campaign title and description.
-3. Add one or more milestone amounts in USDC.
-4. Set voting duration in hours.
-5. Set quorum in basis points.
-6. Set pass threshold in basis points.
-7. Click `Create Campaign`.
-
-Basis point examples:
-
-- `10000` = 100%
-- `6000` = 60%
-- `2000` = 20%
-- `100` = 1%
-
-### Contribute to a Campaign
-
-1. Open a campaign page.
-2. Enter a USDC amount.
-3. Click `Approve + Contribute`.
-4. If allowance is too low, the app sends an approval transaction first.
-5. The contribution transaction deposits USDC into the campaign contract.
-
-### Submit a Milestone
-
-Only the campaign creator can submit a milestone.
-
-1. Open the campaign page.
-2. Enter a `bytes32` evidence hash (temporary format - will be upgraded to IPFS/file uploads in future versions).
-
-3. Submit the milestone.
-4. Voting starts immediately and ends after the configured voting period.
-
-### Vote on a Milestone
-
-Only contributors have voting weight.
-
-1. Open the campaign page during the live voting window.
-2. Review the milestone details and evidence hash.
-3. Click `Vote YES` or `Vote NO`.
-4. The vote weight equals the contributor's total contribution.
-
-### Finalize a Milestone
-
-After the voting period ends:
-
-1. Click `Finalize`.
-2. If quorum and pass thresholds are met, the milestone is approved.
-3. The milestone amount becomes unlocked.
-4. If it was the final milestone, the campaign becomes successful.
-5. If the vote fails, the campaign becomes failed and refunds become available.
-
-### Withdraw Unlocked Funds
-
-Only the creator can withdraw unlocked funds.
-
-1. Open the campaign page.
-2. Enter the amount to withdraw.
-3. Click `Withdraw`.
-4. The contract calculates the protocol fee.
-5. The fee is sent to the treasury.
-6. The creator receives the remaining USDC.
-
-### Claim a Refund
-
-Refunds are available when a campaign is canceled or failed.
-
-1. Open the campaign page.
-2. Check `My refundable`.
-3. Click `Claim refund`.
-4. The campaign sends the refundable USDC back to the contributor.
-
+1. Open https://fundarc.netlify.app.
+2. Review the landing page and live campaign previews.
+3. Open `/discover` to view campaign discovery.
+4. Open `/launch` to inspect campaign creation.
+5. Open a campaign detail page.
+6. Contribute USDC from a test wallet.
+7. Submit milestone evidence as the creator.
+8. Vote as a contributor.
+9. Create a Circle agent wallet.
+10. Delegate voting to the agent wallet.
+11. Run automated agent voting during an active voting window.
+12. Finalize the milestone.
+13. Withdraw unlocked creator funds.
+14. Review creator reputation and dashboard metrics.
 
 ## Roadmap
 
-### Protocol
-- Funding deadlines
-- Minimum funding targets
-- Vote history tracking
-- Test coverage
+### Q3 2026: Production Stability and Indexing
 
-### UX & Frontend
-- Campaign images, categories, profiles
-- Transaction notifications
-- Search & filtering
-- Creator dashboard roles
+- Stronger anti-spam controls
+- Campaign moderation tooling
+- Optimized event indexing
+- Better campaign discovery performance
+- Creator reputation safeguards
+- Contract monitoring and analytics
 
-### Infrastructure
-- IPFS evidence uploads
-- Event indexing for faster dashboards
+### Q3-Q4 2026: Circle-Powered Onboarding and Payments
 
+- Improved Circle agent wallet UX
+- More robust delegated voting
+- Automated voting reliability improvements
+- Circle Paymaster integration research and implementation
+- Better contributor onboarding for USDC-native flows
 
-## Feedback Wanted
+### Q4 2026: Verification and Reputation
 
-I’m actively improving Fundarc and would love input from:
+- Better IPFS milestone evidence UX
+- Automated milestone review agents
+- Richer contributor governance analytics
+- Improved creator reputation scoring
 
-- Smart contract engineers
-- Frontend devs
-- Builders on Arc
+### Q1 2027: Broader USDC Funding
 
-Questions:
-- What would stop you from using this?
-- What’s missing for real-world use?
-- How can UX be improved?
+- Explore Circle Gateway and/or CCTP
+- Crosschain USDC contribution paths
+- Broader creator, community, and grant funding workflows
 
-Open an issue or reach out 👇
+## Grant Relevance
 
+Fundarc is relevant to Circle and Arc because it demonstrates a practical USDC-native application that combines payments, escrow, governance, creator accountability, and agent-assisted participation.
+
+The project showcases:
+
+- USDC as the core funding asset
+- Arc as the settlement environment
+- Smart contracts for transparent funding coordination
+- Circle agent wallets for delegated contributor voting
+- Future potential for Paymaster, Gateway, CCTP, and broader wallet infrastructure
+
+## Team
+
+**Fawaz Oyebode**  
+Founder & Full Stack Blockchain Developer  
+Lagos, Nigeria
+
+Web3 builder focused on smart contract systems, stablecoin applications, and developer tooling on Arc. Creator of Fundarc and the arc-ue4-plugin for Unreal Engine blockchain integrations.
+
+**Rabiah Ubaidu**  
+Smart Contract Security Researcher  
+Kano, Nigeria
+
+Solidity developer and smart contract security researcher focused on identifying vulnerabilities and improving protocol safety. Reviewed Fundarc's smart contracts and provided mitigation recommendations that improved deployment readiness.
 
 ## License
 
-MIT License
-
-Copyright (c) 2026 Fawaz Oyebode
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-...
+This repository is provided for development and grant review purposes. Add a formal license before production or broad external reuse.
 
