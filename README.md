@@ -488,5 +488,4 @@ Solidity developer and smart contract security researcher focused on identifying
 
 ## License
 
-This repository is provided for development and grant review purposes. Add a formal license before production or broad external reuse.
-
+Fundarc is released under the [MIT License](LICENSE). The Solidity contracts also include MIT SPDX identifiers.
