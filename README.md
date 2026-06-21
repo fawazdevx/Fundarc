@@ -81,7 +81,6 @@ Arc Testnet:
 | Factory Proxy | `0x6D7FFE972726134B880b43B3866fF97e72ac7792` |
 | FundarcCampaign Implementation | `0x2210f569946251a00809DAF95FCe2656CadA296d` |
 | FundarcFactory Implementation | `0x222f72a92785Fa6B0f4730284F49D042234fFCE8` |
-| Owner / Deployer | `0xB3aae9496a6670d13e1b80B1Fb3ad445c635aC23` |
 
 Arc Testnet reference:
 
