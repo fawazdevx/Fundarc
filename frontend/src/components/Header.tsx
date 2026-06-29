@@ -8,7 +8,7 @@ import Link from "next/link";
 import { ConnectButton, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useDisconnect } from "wagmi";
 import { useANSReverse } from "@arcnames/sdk-react";
-import { BarChart3, ChevronDown, Compass, LogOut, Rocket } from "lucide-react";
+import { BarChart3, ChevronDown, Compass, LogOut, Menu, Rocket, X } from "lucide-react";
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -110,13 +110,39 @@ function FundarcConnectButton() {
 }
 
 export function Header() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const navRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!navRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    function handleKeydown(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeydown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeydown);
+    };
+  }, [menuOpen]);
+
+  const closeMenu = () => setMenuOpen(false);
+
   return (
     <div className="header">
       <div className="header-inner">
         <div className="brand">
-          <Link href="/" className="hero-title">
+          <Link href="/" className="hero-title" onClick={closeMenu}>
             <Image
-              src="/brand/favicon.svg"
+              src="/brand/fundarc-logo.png"
               alt=""
               width={34}
               height={34}
@@ -133,20 +159,34 @@ export function Header() {
           </small>
         </div>
 
-        <div className="wallet-slot">
-          <Link className="btn btn-sm" href="/launch">
-            <Rocket size={16} />
-            Create
-          </Link>
-          <Link className="btn btn-sm" href="/discover">
-            <Compass size={16} />
-            Discover
-          </Link>
-          <Link className="btn btn-sm" href="/dashboard">
-            <BarChart3 size={16} />
-            Metrics
-          </Link>
-          <FundarcConnectButton />
+        <div className="header-controls" ref={navRef}>
+          <nav className={`header-nav ${menuOpen ? "header-nav-open" : ""}`} aria-label="Primary">
+            <Link className="btn btn-sm" href="/launch" onClick={closeMenu}>
+              <Rocket size={16} />
+              Create
+            </Link>
+            <Link className="btn btn-sm" href="/discover" onClick={closeMenu}>
+              <Compass size={16} />
+              Discover
+            </Link>
+            <Link className="btn btn-sm" href="/dashboard" onClick={closeMenu}>
+              <BarChart3 size={16} />
+              Metrics
+            </Link>
+          </nav>
+
+          <div className="wallet-slot">
+            <FundarcConnectButton />
+            <button
+              type="button"
+              className="nav-toggle"
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              {menuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
         </div>
       </div>
     </div>

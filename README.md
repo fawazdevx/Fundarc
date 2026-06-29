@@ -362,6 +362,15 @@ NEXT_PUBLIC_WC_PROJECT_ID=
 CIRCLE_API_KEY=
 CIRCLE_ENTITY_SECRET=
 CIRCLE_WALLET_SET_ID=
+
+# Enables protected scheduled/background auto-voting.
+AGENT_AUTOMATION_SECRET=
+
+# Optional automation tuning.
+AGENT_SWEEP_CAMPAIGN_LIMIT=20
+AGENT_SWEEP_CONTRIBUTOR_LIMIT=60
+AGENT_SWEEP_BLOCK_LOOKBACK=200000
+AGENT_SWEEP_CAMPAIGN_OFFSET=0
 ```
 
 Run the frontend:
@@ -426,6 +435,46 @@ Recommended review flow:
 12. Finalize the milestone.
 13. Withdraw unlocked creator funds.
 14. Review creator reputation and dashboard metrics.
+
+## Automatic Agent Voting
+
+Fundarc supports unattended agent voting after a contributor assigns an agent wallet.
+
+The onchain contract stores the contributor's selected delegate in `voteDelegate`. Because Solidity mappings are not enumerable, the backend automation discovers delegated voters from `VoteDelegateUpdated` events, then verifies current onchain state before voting.
+
+Automation behavior:
+
+1. A scheduled function calls `/api/agents/auto-vote/sweep`.
+2. The sweep scans recent campaigns and active voting milestones.
+3. It loads contributor delegate events for each live campaign.
+4. It skips contributors who have no contribution weight, already voted, revoked their delegate, or assigned a different wallet.
+5. It calls Circle contract execution from the delegated agent wallet.
+6. The agent wallet calls `voteFor(contributor, milestoneIndex, support)`.
+
+Required server environment variables:
+
+```env
+AGENT_AUTOMATION_SECRET=
+CIRCLE_API_KEY=
+CIRCLE_ENTITY_SECRET=
+CIRCLE_WALLET_SET_ID=
+ARC_RPC_URL=
+NEXT_PUBLIC_FACTORY_ADDRESS=
+```
+
+The Netlify scheduled function `agent-auto-vote-sweep` runs every five minutes. You can also trigger the sweep manually or from another scheduler:
+
+```bash
+curl -X POST "https://YOUR_SITE_URL/api/agents/auto-vote/sweep" \
+  -H "x-fundarc-agent-secret: $AGENT_AUTOMATION_SECRET"
+```
+
+Optional tuning:
+
+- `AGENT_SWEEP_CAMPAIGN_LIMIT`: number of campaigns to scan per run.
+- `AGENT_SWEEP_CONTRIBUTOR_LIMIT`: maximum delegate candidates to process per run.
+- `AGENT_SWEEP_BLOCK_LOOKBACK`: block range used to find delegate events.
+- `AGENT_SWEEP_CAMPAIGN_OFFSET`: scan older campaigns when the newest campaigns are not the current targets.
 
 ## Roadmap
 

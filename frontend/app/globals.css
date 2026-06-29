@@ -1954,11 +1954,103 @@ input[type="checkbox"] {
   animation: fundarc-pulse 2.4s ease-out infinite;
 }
 
+.header-controls {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.header .btn {
+  width: auto;
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .wallet-slot {
   display: flex;
   align-items: center;
   gap: 10px;
   flex: 0 0 auto;
+}
+
+.nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.nav-toggle:hover {
+  border-color: rgba(45, 212, 191, 0.5);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-toggle:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Wallet account dropdown */
+.wallet-account-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.wallet-account-trigger {
+  max-width: 100%;
+}
+
+.wallet-account-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  min-width: 180px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(11, 14, 21, 0.96);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  animation: fundarc-rise 0.18s var(--ease) both;
+}
+
+.wallet-account-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.18s var(--ease), color 0.18s var(--ease);
+}
+
+.wallet-account-action:hover {
+  background: rgba(251, 113, 133, 0.12);
+  color: rgba(255, 228, 230, 0.98);
 }
 
 [data-rk] {
@@ -2012,6 +2104,46 @@ a.btn-primary:hover {
   }
 }
 
+/* Collapse primary nav into a hamburger menu on narrow viewports */
+@media (max-width: 860px) {
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .header-controls {
+    gap: 10px;
+  }
+
+  .header-nav {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    z-index: 55;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    min-width: 220px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: rgba(11, 14, 21, 0.97);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  }
+
+  .header-nav-open {
+    display: flex;
+    animation: fundarc-rise 0.18s var(--ease) both;
+  }
+
+  .header .header-nav .btn {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 960px) {
 
   .grid-2,
@@ -2054,6 +2186,19 @@ a.btn-primary:hover {
   }
 }
 
+/* Tablet range: keep two columns where one would waste space */
+@media (min-width: 700px) and (max-width: 960px) {
+  .grid-3,
+  .form-grid,
+  .agent-review-grid,
+  .assistant-grid,
+  .reputation-metrics,
+  .reputation-metrics.compact,
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 700px) {
   .page {
     width: min(100% - 24px, 1180px);
@@ -2062,10 +2207,9 @@ a.btn-primary:hover {
 
   .header-inner {
     width: min(100% - 24px, 1180px);
-    min-height: 0;
-    padding: 12px 0;
-    align-items: flex-start;
-    flex-direction: column;
+    min-height: 64px;
+    padding: 10px 0;
+    gap: 10px;
   }
 
   .hero,
@@ -2073,13 +2217,12 @@ a.btn-primary:hover {
     padding: 14px;
   }
 
-  .brand small {
-    padding-left: 0;
+  .brand a {
+    font-size: 18px;
   }
 
-  .wallet-slot {
-    width: 100%;
-    flex-wrap: wrap;
+  .brand small {
+    font-size: 11px;
   }
 
   .landing-section {
@@ -2176,5 +2319,20 @@ a.btn-primary:hover {
   .reputation-score {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+/* Small phones: trim the header so it never overflows a single row */
+@media (max-width: 480px) {
+  .brand small {
+    display: none;
+  }
+
+  .wallet-account-trigger .badge {
+    display: none;
+  }
+
+  .wallet-account-trigger {
+    padding: 9px 13px;
   }
 }

@@ -260,7 +260,7 @@ export default function LandingPage() {
         <div className="landing-float landing-float-right" aria-hidden="true">
           <div className="logo-orbit">
             <span className="logo-face">
-              <Image src="/brand/favicon.svg" alt="" width={92} height={92} />
+              <Image src="/brand/fundarc-logo.png" alt="" width={92} height={92} />
             </span>
           </div>
           <div className="float-panel lock-panel">
